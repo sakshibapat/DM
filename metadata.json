@@ -1,0 +1,6 @@
+{
+  "name": "PrivaMap - Enterprise Privacy Management Platform",
+  "description": "Enterprise Privacy Management Platform featuring comprehensive data mapping, inventory relations, compliance tracking, and governance dashboards.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
