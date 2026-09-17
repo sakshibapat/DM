@@ -169,7 +169,7 @@ export const Sidebar: React.FC = () => {
           >
             <span className="flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              future modules TBC
+              Future Modules
             </span>
             {futureModulesOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
           </button>
