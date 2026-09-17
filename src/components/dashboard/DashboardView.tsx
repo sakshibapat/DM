@@ -74,7 +74,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenCreateModal 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-5">
         <div>
           <h1 className="text-xl font-extrabold text-slate-900 tracking-tight">
-            Data Mapping & Governance Overview
+            Data Mapping & Governance Dashboard
           </h1>
           <p className="text-xs text-slate-500 mt-1 max-w-2xl leading-relaxed">
             Centralized register of data processing operations, systems, vendors, and legal entities. Monitor compliance posture and missing safeguards in real-time.
