@@ -109,7 +109,7 @@ export const Sidebar: React.FC = () => {
             }`}
           >
             <LayoutDashboard className="w-4 h-4" />
-            <span>Dashboard</span>
+            <span>dasshbaord</span>
             {metrics.attentionItemsCount > 0 && (
               <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-rose-500 text-white font-bold">
                 {metrics.attentionItemsCount}
