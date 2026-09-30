@@ -11,6 +11,7 @@ import {
   DataMappingMetrics,
   PrivacyRecord,
 } from '../types/privacy';
+import { PrivacyAssessment } from '../types/assessment';
 import {
   loadDataStore,
   saveDataStore,
@@ -24,6 +25,7 @@ interface PrivacyDataContextType {
   vendors: Vendor[];
   entities: Entity[];
   auditLogs: AuditLogEntry[];
+  privacyAssessments: PrivacyAssessment[];
   
   // Navigation State
   activeNav: string; // 'dashboard' | 'processingActivities' | 'tspReferences' | 'assets' | 'vendors' | 'entities' | 'future-assessments' | ...
@@ -42,6 +44,11 @@ interface PrivacyDataContextType {
   updateRecord: (inventoryType: InventoryType, id: string, recordData: Partial<PrivacyRecord>) => void;
   deleteRecord: (inventoryType: InventoryType, id: string) => void;
   duplicateRecord: (inventoryType: InventoryType, id: string) => void;
+  addAssessment: (
+    assessment: Omit<PrivacyAssessment, 'id' | 'createdBy' | 'createdDate' | 'lastModifiedBy' | 'lastModifiedDate'>
+  ) => string;
+  updateAssessment: (id: string, assessment: Partial<PrivacyAssessment>) => void;
+  deleteAssessment: (id: string) => void;
   
   // Bidirectional Relationship Helpers
   getRelatedRecords: (id: string, type: InventoryType) => {
@@ -79,6 +86,7 @@ export const PrivacyDataProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const [vendors, setVendors] = useState<Vendor[]>(initialData.vendors);
   const [entities, setEntities] = useState<Entity[]>(initialData.entities);
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>(initialData.auditLogs);
+  const [privacyAssessments, setPrivacyAssessments] = useState<PrivacyAssessment[]>(initialData.privacyAssessments);
 
   // Save state to Local Storage
   useEffect(() => {
@@ -89,9 +97,10 @@ export const PrivacyDataProvider: React.FC<{ children: React.ReactNode }> = ({ c
       vendors,
       entities,
       auditLogs,
+      privacyAssessments,
     };
     saveDataStore(storePayload);
-  }, [processingActivities, tspReferences, assets, vendors, entities, auditLogs]);
+  }, [processingActivities, tspReferences, assets, vendors, entities, auditLogs, privacyAssessments]);
 
   // Compute Bidirectional Relationships dynamically
   const getRelatedRecords = useMemo(() => {
@@ -719,6 +728,47 @@ export const PrivacyDataProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
   };
 
+  const addAssessment = (
+    assessment: Omit<PrivacyAssessment, 'id' | 'createdBy' | 'createdDate' | 'lastModifiedBy' | 'lastModifiedDate'>
+  ): string => {
+    const now = new Date().toISOString();
+    const currentUser = 'privacy.admin@privacorp.com';
+    const newId = `ASM-${Math.floor(100 + Math.random() * 900)}`;
+    const record: PrivacyAssessment = {
+      ...assessment,
+      id: newId,
+      createdBy: currentUser,
+      createdDate: now,
+      lastModifiedBy: currentUser,
+      lastModifiedDate: now,
+    };
+    setPrivacyAssessments(prev => [record, ...prev]);
+    return newId;
+  };
+
+  const updateAssessment = (id: string, assessment: Partial<PrivacyAssessment>) => {
+    const now = new Date().toISOString();
+    setPrivacyAssessments(prev =>
+      prev.map(item =>
+        item.id === id
+          ? {
+              ...item,
+              ...assessment,
+              id: item.id,
+              createdBy: item.createdBy,
+              createdDate: item.createdDate,
+              lastModifiedBy: 'privacy.admin@privacorp.com',
+              lastModifiedDate: now,
+            }
+          : item
+      )
+    );
+  };
+
+  const deleteAssessment = (id: string) => {
+    setPrivacyAssessments(prev => prev.filter(item => item.id !== id));
+  };
+
   const resetToDefaultData = () => {
     const demoData = resetToDemoStore();
     setProcessingActivities(demoData.processingActivities);
@@ -727,6 +777,7 @@ export const PrivacyDataProvider: React.FC<{ children: React.ReactNode }> = ({ c
     setVendors(demoData.vendors);
     setEntities(demoData.entities);
     setAuditLogs(demoData.auditLogs);
+    setPrivacyAssessments(demoData.privacyAssessments);
   };
 
   const exportDataJSON = () => {
@@ -739,6 +790,7 @@ export const PrivacyDataProvider: React.FC<{ children: React.ReactNode }> = ({ c
       vendors,
       entities,
       auditLogs,
+      privacyAssessments,
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -759,6 +811,7 @@ export const PrivacyDataProvider: React.FC<{ children: React.ReactNode }> = ({ c
         setVendors(parsed.vendors);
         if (parsed.entities) setEntities(parsed.entities);
         if (parsed.auditLogs) setAuditLogs(parsed.auditLogs);
+        if (Array.isArray(parsed.privacyAssessments)) setPrivacyAssessments(parsed.privacyAssessments);
         return true;
       }
     } catch (e) {
@@ -776,6 +829,7 @@ export const PrivacyDataProvider: React.FC<{ children: React.ReactNode }> = ({ c
         vendors,
         entities,
         auditLogs,
+        privacyAssessments,
         activeNav,
         setActiveNav,
         selectedRecord,
@@ -786,6 +840,9 @@ export const PrivacyDataProvider: React.FC<{ children: React.ReactNode }> = ({ c
         updateRecord,
         deleteRecord,
         duplicateRecord,
+        addAssessment,
+        updateAssessment,
+        deleteAssessment,
         getRelatedRecords,
         attentionItems,
         metrics,
