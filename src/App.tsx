@@ -8,6 +8,7 @@ import { RecordDetailDrawer } from './components/inventory/RecordDetailDrawer';
 import { RecordFormModal } from './components/inventory/RecordFormModal';
 import { DataFlowsView } from './components/flows/DataFlowsView';
 import { FutureModulePlaceholder } from './components/future/FutureModulePlaceholder';
+import { AssessmentsView } from './components/assessments/AssessmentsView';
 import { InventoryType } from './types/privacy';
 
 const MainAppContent: React.FC = () => {
@@ -67,6 +68,10 @@ const MainAppContent: React.FC = () => {
 
     if (activeNav === 'dataFlows') {
       return <DataFlowsView />;
+    }
+
+    if (activeNav === 'privacyAssessments' || activeNav === 'future-assessments') {
+      return <AssessmentsView />;
     }
 
     if (activeNav.startsWith('future-')) {

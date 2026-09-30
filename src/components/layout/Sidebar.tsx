@@ -21,7 +21,7 @@ import {
 import { usePrivacyData } from '../../context/PrivacyDataContext';
 
 export const Sidebar: React.FC = () => {
-  const { activeNav, setActiveNav, metrics } = usePrivacyData();
+  const { activeNav, setActiveNav, metrics, privacyAssessments } = usePrivacyData();
   const [dataMappingOpen, setDataMappingOpen] = useState(true);
   const [futureModulesOpen, setFutureModulesOpen] = useState(true);
 
@@ -70,7 +70,6 @@ export const Sidebar: React.FC = () => {
   ];
 
   const futureModules = [
-    { id: 'future-assessments', label: 'Assessments / DPIAs', icon: FileCheck },
     { id: 'future-risks', label: 'Risk Management', icon: ShieldAlert },
     { id: 'future-incidents', label: 'Privacy Incidents', icon: AlertTriangle },
     { id: 'future-dsars', label: 'Data Subject Requests', icon: UserCheck },
@@ -158,6 +157,32 @@ export const Sidebar: React.FC = () => {
               })}
             </div>
           )}
+        </div>
+
+        <div>
+          <div className="w-full flex items-center text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 px-2">
+            <span className="flex items-center gap-1.5">
+              <FileCheck className="w-3.5 h-3.5 text-indigo-400" />
+              Privacy Assessments
+            </span>
+          </div>
+          <div className="pl-1">
+            <button
+              type="button"
+              onClick={() => setActiveNav('privacyAssessments')}
+              className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-xs transition font-medium ${
+                activeNav === 'privacyAssessments' || activeNav === 'future-assessments'
+                  ? 'bg-slate-800 text-white font-semibold border-l-2 border-indigo-500 pl-2'
+                  : 'text-slate-300 hover:bg-slate-800/50 hover:text-white'
+              }`}
+            >
+              <FileCheck className="w-3.5 h-3.5 text-indigo-400" />
+              <span className="truncate">Assessments</span>
+              <span className="ml-auto text-[10px] font-mono font-medium px-1.5 py-0.2 rounded bg-slate-800 text-slate-400">
+                {privacyAssessments.length}
+              </span>
+            </button>
+          </div>
         </div>
 
         {/* Future Modules Section (Disabled / Coming Soon) */}

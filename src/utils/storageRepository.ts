@@ -6,6 +6,7 @@ import {
   Entity,
   AuditLogEntry,
 } from '../types/privacy';
+import { PrivacyAssessment } from '../types/assessment';
 import {
   initialProcessingActivities,
   initialTSPReferences,
@@ -14,6 +15,7 @@ import {
   initialEntities,
   initialAuditLogs,
 } from '../data/mockSeedData';
+import { initialPrivacyAssessments } from '../data/assessmentSeedData';
 
 const LOCAL_STORAGE_KEY = 'privamap_data_store_v1';
 
@@ -24,6 +26,7 @@ export interface DataStore {
   vendors: Vendor[];
   entities: Entity[];
   auditLogs: AuditLogEntry[];
+  privacyAssessments: PrivacyAssessment[];
 }
 
 /**
@@ -48,6 +51,9 @@ export const loadDataStore = (): DataStore => {
           vendors: parsed.vendors,
           entities: parsed.entities || [],
           auditLogs: parsed.auditLogs || [],
+          privacyAssessments: Array.isArray(parsed.privacyAssessments)
+            ? parsed.privacyAssessments
+            : initialPrivacyAssessments,
         };
       }
     } catch (e) {
@@ -63,6 +69,7 @@ export const loadDataStore = (): DataStore => {
     vendors: initialVendors,
     entities: initialEntities,
     auditLogs: initialAuditLogs,
+    privacyAssessments: initialPrivacyAssessments,
   };
   
   localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(seedStore));
@@ -91,6 +98,7 @@ export const resetToDemoStore = (): DataStore => {
     vendors: initialVendors,
     entities: initialEntities,
     auditLogs: initialAuditLogs,
+    privacyAssessments: initialPrivacyAssessments,
   };
   localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(seedStore));
   return seedStore;
