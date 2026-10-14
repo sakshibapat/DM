@@ -8,6 +8,7 @@ import {
   Globe2,
   ShieldAlert,
   FileCheck,
+  ClipboardList,
   AlertTriangle,
   UserCheck,
   BarChart3,
@@ -180,6 +181,32 @@ export const Sidebar: React.FC = () => {
               <span className="truncate">Assessments</span>
               <span className="ml-auto text-[10px] font-mono font-medium px-1.5 py-0.2 rounded bg-slate-800 text-slate-400">
                 {privacyAssessments.length}
+              </span>
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <div className="w-full flex items-center text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 px-2">
+            <span className="flex items-center gap-1.5">
+              <ClipboardList className="w-3.5 h-3.5 text-indigo-400" />
+              RoPA
+            </span>
+          </div>
+          <div className="pl-1">
+            <button
+              type="button"
+              onClick={() => setActiveNav('ropa')}
+              className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-xs transition font-medium ${
+                activeNav === 'ropa'
+                  ? 'bg-slate-800 text-white font-semibold border-l-2 border-indigo-500 pl-2'
+                  : 'text-slate-300 hover:bg-slate-800/50 hover:text-white'
+              }`}
+            >
+              <ClipboardList className="w-3.5 h-3.5 text-indigo-400" />
+              <span className="truncate">Record of Processing</span>
+              <span className="ml-auto text-[10px] font-mono font-medium px-1.5 py-0.2 rounded bg-slate-800 text-slate-400">
+                {metrics.totalProcessingActivities}
               </span>
             </button>
           </div>

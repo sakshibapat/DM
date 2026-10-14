@@ -129,6 +129,8 @@ export const Header: React.FC<HeaderProps> = ({ onOpenCreateModal }) => {
       case 'privacyAssessments':
       case 'future-assessments':
         return 'Privacy Assessments';
+      case 'ropa':
+        return 'RoPA / Record of Processing Activities';
       case 'future-risks':
         return 'Risk Management Module';
       case 'future-incidents':
