@@ -58,13 +58,21 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
   const [primaryHostingLocation, setPrimaryHostingLocation] = useState<string>(locationOptions[0]);
   const [additionalHostingLocations, setAdditionalHostingLocations] = useState<string[]>([]);
   const [itOwner, setItOwner] = useState('');
-  const [status, setStatus] = useState<StatusType>('Approved');
-  const [dataClassification, setDataClassification] = useState<DataClassification>('Confidential');
+  const [status, setStatus] = useState<StatusType>(
+    (statusOptions.includes('Approved') ? 'Approved' : statusOptions[0]) as StatusType
+  );
+  const [dataClassification, setDataClassification] = useState<DataClassification>(
+    (classificationOptions.includes('Confidential') ? 'Confidential' : classificationOptions[0]) as DataClassification
+  );
 
   // Security Measures State (Reusable TOM Component State)
-  const [tspStatus, setTspStatus] = useState<TSPStatusOption>('Yes');
+  const [tspStatus, setTspStatus] = useState<TSPStatusOption>(
+    (tspStatusOptions.includes('Yes') ? 'Yes' : tspStatusOptions[0]) as TSPStatusOption
+  );
   const [tspJustification, setTspJustification] = useState('');
-  const [toms, setToms] = useState<string[]>(['Encryption at rest', 'Encryption in transit']);
+  const [toms, setToms] = useState<string[]>(
+    ['Encryption at rest', 'Encryption in transit'].filter(item => tomOptions.includes(item))
+  );
   const [tomsOther, setTomsOther] = useState('');
 
   // Relationship state
@@ -170,11 +178,18 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
       setPrimaryHostingLocation(locationOptions[0]);
       setAdditionalHostingLocations([]);
       setItOwner('');
-      setStatus('Approved');
-      setDataClassification('Confidential');
-      setTspStatus('Yes');
+      setStatus((statusOptions.includes('Approved') ? 'Approved' : statusOptions[0]) as StatusType);
+      setDataClassification(
+        (classificationOptions.includes('Confidential') ? 'Confidential' : classificationOptions[0]) as DataClassification
+      );
+      setTspStatus(
+        (tspStatusOptions.includes('Yes') ? 'Yes' : tspStatusOptions[0]) as TSPStatusOption
+      );
       setTspJustification('');
-      setToms(['Encryption at rest', 'Encryption in transit', 'Role Based Access Controls']);
+      setToms(
+        ['Encryption at rest', 'Encryption in transit', 'Role Based Access Controls']
+          .filter(item => tomOptions.includes(item))
+      );
       setTomsOther('');
       setProcessingActivityIds([]);
       setVendorIds([]);

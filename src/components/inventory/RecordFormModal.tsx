@@ -42,12 +42,17 @@ export const RecordFormModal: React.FC<RecordFormModalProps> = ({
   } = usePrivacyData();
 
   const isEdit = Boolean(recordIdToEdit);
+  const enabledStatuses = getConfiguredOptions(inventoryType, 'statuses');
+  const enabledTspCategories = getConfiguredOptions('tspReferences', 'categories');
+  const enabledVendorDpaStatuses = getConfiguredOptions('vendors', 'dpaStatuses');
+  const enabledVendorCertifications = getConfiguredOptions('vendors', 'certifications');
+  const enabledEntityJurisdictions = getConfiguredOptions('entities', 'jurisdictions');
 
   // Default initial form state
   const [formData, setFormData] = useState<any>({
     name: '',
     description: '',
-    status: 'Approved' as StatusType,
+    status: (enabledStatuses.includes('Approved') ? 'Approved' : enabledStatuses[0]) as StatusType,
     tags: [],
     // PA
     role: 'Controller' as ProcessingRole,
@@ -65,35 +70,37 @@ export const RecordFormModal: React.FC<RecordFormModalProps> = ({
     vendorIds: [],
     entityIds: [],
     // TSP
-    category: 'SaaS Application',
+    category: enabledTspCategories[0] || '',
     versionOrPlan: '',
     // Asset
     assetType: 'Database' as AssetType,
     dataClassification: 'Confidential' as DataClassification,
     hostingLocation: 'AWS US-East',
     // Vendor
-    dpaStatus: 'Signed' as DpaStatus,
+    dpaStatus: (enabledVendorDpaStatuses.includes('Signed') ? 'Signed' : enabledVendorDpaStatuses[0]) as DpaStatus,
     headquarters: 'San Francisco, CA, USA',
     contactEmail: 'privacy@vendor.com',
-    securityCertifications: ['ISO 27001', 'SOC 2 Type II'],
+    securityCertifications: ['ISO 27001', 'SOC 2 Type II'].filter(item => enabledVendorCertifications.includes(item)),
     website: '',
     // Entity
-    jurisdiction: 'EU - Netherlands',
+    jurisdiction: enabledEntityJurisdictions.includes('EU - Netherlands')
+      ? 'EU - Netherlands'
+      : enabledEntityJurisdictions[0] || '',
     registrationNumber: '',
     dpoContact: '',
     address: '',
   });
 
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
-  const statusOptions = getConfiguredOptions(inventoryType, 'statuses', [formData.status || '']);
-  const tspCategoryOptions = getConfiguredOptions('tspReferences', 'categories', [formData.category || '']);
-  const vendorDpaStatusOptions = getConfiguredOptions('vendors', 'dpaStatuses', [formData.dpaStatus || '']);
+  const statusOptions = getConfiguredOptions(inventoryType, 'statuses', isEdit ? [formData.status || ''] : []);
+  const tspCategoryOptions = getConfiguredOptions('tspReferences', 'categories', isEdit ? [formData.category || ''] : []);
+  const vendorDpaStatusOptions = getConfiguredOptions('vendors', 'dpaStatuses', isEdit ? [formData.dpaStatus || ''] : []);
   const vendorCertificationOptions = getConfiguredOptions(
     'vendors',
     'certifications',
-    formData.securityCertifications || []
+    isEdit ? formData.securityCertifications || [] : []
   );
-  const entityJurisdictionOptions = getConfiguredOptions('entities', 'jurisdictions', [formData.jurisdiction || '']);
+  const entityJurisdictionOptions = getConfiguredOptions('entities', 'jurisdictions', isEdit ? [formData.jurisdiction || ''] : []);
 
   // Populate form if editing
   useEffect(() => {
@@ -113,7 +120,7 @@ export const RecordFormModal: React.FC<RecordFormModalProps> = ({
       setFormData({
         name: '',
         description: '',
-        status: 'Approved',
+        status: enabledStatuses.includes('Approved') ? 'Approved' : enabledStatuses[0],
         tags: [],
         role: 'Controller',
         legalBasis: 'Legitimate Interest',
@@ -129,17 +136,20 @@ export const RecordFormModal: React.FC<RecordFormModalProps> = ({
         assetIds: [],
         vendorIds: [],
         entityIds: [],
-        category: 'SaaS Platform',
+        category: enabledTspCategories[0] || '',
         versionOrPlan: '',
         assetType: 'Database',
         dataClassification: 'Confidential',
         hostingLocation: 'AWS Cloud',
-        dpaStatus: 'Signed',
+        dpaStatus: enabledVendorDpaStatuses.includes('Signed') ? 'Signed' : enabledVendorDpaStatuses[0],
         headquarters: 'San Francisco, CA, USA',
         contactEmail: 'privacy@vendor.com',
-        securityCertifications: ['ISO 27001', 'SOC 2 Type II'],
+        securityCertifications: ['ISO 27001', 'SOC 2 Type II']
+          .filter(item => enabledVendorCertifications.includes(item)),
         website: '',
-        jurisdiction: 'EU - Netherlands',
+        jurisdiction: enabledEntityJurisdictions.includes('EU - Netherlands')
+          ? 'EU - Netherlands'
+          : enabledEntityJurisdictions[0] || '',
         registrationNumber: '',
         dpoContact: '',
         address: '',

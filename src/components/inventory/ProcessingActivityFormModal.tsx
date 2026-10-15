@@ -109,28 +109,37 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
   } = usePrivacyData();
 
   const isEdit = Boolean(recordIdToEdit);
+  const enabledStatuses = getConfiguredOptions('processingActivities', 'statuses');
+  const enabledRoles = getConfiguredOptions('processingActivities', 'roles');
+  const enabledLegalBases = getConfiguredOptions('processingActivities', 'legalBases');
+  const enabledDataSubjectCategories = getConfiguredOptions('processingActivities', 'dataSubjectCategories');
+  const enabledPersonalDataItems = getConfiguredOptions('processingActivities', 'personalDataItems');
+  const enabledInternalRecipients = getConfiguredOptions('processingActivities', 'internalRecipients');
+  const enabledExternalRecipients = getConfiguredOptions('processingActivities', 'externalRecipients');
+  const enabledToms = getConfiguredOptions('processingActivities', 'toms');
+  const enabledTspStatuses = getConfiguredOptions('processingActivities', 'tspStatuses');
   const [currentStep, setCurrentStep] = useState<number>(1);
 
   // Form State
   const [formData, setFormData] = useState<Partial<ProcessingActivity>>({
     name: '',
     description: '',
-    status: 'Draft' as StatusType,
+    status: (enabledStatuses.includes('Draft') ? 'Draft' : enabledStatuses[0]) as StatusType,
     owner: '',
-    role: 'Controller' as ProcessingRole,
+    role: (enabledRoles.includes('Controller') ? 'Controller' : enabledRoles[0]) as ProcessingRole,
     dataProtectionContact: '',
     controllerContactDetails: '',
     purpose: '',
     processorAndControllerDetails: '',
     categoriesOfProcessing: [],
-    legalBasis: 'Legitimate Interest' as LegalBasis,
+    legalBasis: (enabledLegalBases[0] || '') as LegalBasis,
     retentionPeriod: '3 Years',
     hasRetentionPolicy: true,
-    personalDataCategories: ['Contact Info'],
+    personalDataCategories: enabledPersonalDataItems.slice(0, 1),
     involvesHighRiskData: false,
     transferSafeguards: 'EU Standard Contractual Clauses (SCCs)',
-    toms: ['AES-256 Encryption at Rest', 'TLS 1.3 in Transit'],
-    dataSubjectCategories: ['Customers'],
+    toms: enabledToms.slice(0, 2),
+    dataSubjectCategories: enabledDataSubjectCategories.slice(0, 1),
     tspIds: [],
     assetIds: [],
     dataSourceAssetIds: [],
@@ -140,47 +149,47 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
     tags: [],
   });
 
-  const statusOptions = getConfiguredOptions('processingActivities', 'statuses', [formData.status || '']);
-  const roleOptions = getConfiguredOptions('processingActivities', 'roles', [formData.role || '']);
-  const controllerPurposeOptions = getConfiguredOptions('processingActivities', 'controllerPurposes', [formData.purpose || '']);
+  const statusOptions = getConfiguredOptions('processingActivities', 'statuses', isEdit ? [formData.status || ''] : []);
+  const roleOptions = getConfiguredOptions('processingActivities', 'roles', isEdit ? [formData.role || ''] : []);
+  const controllerPurposeOptions = getConfiguredOptions('processingActivities', 'controllerPurposes', isEdit ? [formData.purpose || ''] : []);
   const processorCategoryOptions = getConfiguredOptions(
     'processingActivities',
     'processorCategories',
-    formData.categoriesOfProcessing as string[] || []
+    isEdit ? (formData.categoriesOfProcessing as string[] || []) : []
   );
-  const legalBasisOptions = getConfiguredOptions('processingActivities', 'legalBases', [formData.legalBasis || '']);
+  const legalBasisOptions = getConfiguredOptions('processingActivities', 'legalBases', isEdit ? [formData.legalBasis || ''] : []);
   const dataSubjectCategoryOptions = getConfiguredOptions(
     'processingActivities',
     'dataSubjectCategories',
-    formData.dataSubjectCategories || []
+    isEdit ? formData.dataSubjectCategories || [] : []
   );
   const configuredPersonalDataItems = getConfiguredOptions(
     'processingActivities',
     'personalDataItems',
-    formData.personalDataCategories || []
+    isEdit ? formData.personalDataCategories || [] : []
   );
   const internalRecipientOptions = getConfiguredOptions(
     'processingActivities',
     'internalRecipients',
-    (formData.recipientCategories || []).filter(value => RECIPIENT_CATEGORIES_INTERNAL.includes(value as any))
+    isEdit ? (formData.recipientCategories || []).filter(value => RECIPIENT_CATEGORIES_INTERNAL.includes(value as any)) : []
   );
   const externalRecipientOptions = getConfiguredOptions(
     'processingActivities',
     'externalRecipients',
-    (formData.recipientCategories || []).filter(value => RECIPIENT_CATEGORIES_EXTERNAL.includes(value as any))
+    isEdit ? (formData.recipientCategories || []).filter(value => RECIPIENT_CATEGORIES_EXTERNAL.includes(value as any)) : []
   );
   const transferRegionOptions = getConfiguredOptions(
     'processingActivities',
     'transferRegions',
-    formData.selectedTransferRegions || []
+    isEdit ? formData.selectedTransferRegions || [] : []
   );
   const transferSafeguardOptions = getConfiguredOptions(
     'processingActivities',
     'transferSafeguards',
-    (formData.internationalTransferDetails || []).map(detail => detail.safeguard).filter(Boolean)
+    isEdit ? (formData.internationalTransferDetails || []).map(detail => detail.safeguard).filter(Boolean) : []
   );
-  const configuredToms = getConfiguredOptions('processingActivities', 'toms', formData.toms || []);
-  const configuredTspStatuses = getConfiguredOptions('processingActivities', 'tspStatuses', [formData.tspStatus || '']);
+  const configuredToms = getConfiguredOptions('processingActivities', 'toms', isEdit ? formData.toms || [] : []);
+  const configuredTspStatuses = getConfiguredOptions('processingActivities', 'tspStatuses', isEdit ? [formData.tspStatus || ''] : []);
 
   // Role switch warning modal state
   const [pendingRoleSwitch, setPendingRoleSwitch] = useState<ProcessingRole | null>(null);
@@ -268,14 +277,16 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
         });
       }
     } else {
-      const defaultCategories = ['Customers or Prospects'];
-      const defaultMap: Record<string, string[]> = {
-        'Customers or Prospects': [
-          'Name (First, Last, or both)',
-          'Email address',
-          'Device information (such as IP Address, MAC address)',
-        ],
-      };
+      const defaultCategory = enabledDataSubjectCategories[0];
+      const defaultCategories = defaultCategory ? [defaultCategory] : [];
+      const preferredItems = [
+        'Name (First, Last, or both)',
+        'Email address',
+        'Device information (such as IP Address, MAC address)',
+      ].filter(item => enabledPersonalDataItems.includes(item));
+      const defaultMap: Record<string, string[]> = defaultCategory
+        ? { [defaultCategory]: preferredItems.length ? preferredItems : enabledPersonalDataItems.slice(0, 3) }
+        : {};
       const allPersonalData = Array.from(new Set((Object.values(defaultMap) as string[][]).flat()));
       const hasHighRisk = allPersonalData.some(item => getPersonalDataMetadata(item).isHighRisk);
 
@@ -283,27 +294,31 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
       setFormData({
         name: '',
         description: '',
-        status: 'Draft',
+        status: (enabledStatuses.includes('Draft') ? 'Draft' : enabledStatuses[0]) as StatusType,
         owner: '',
-        role: 'Controller',
+        role: (enabledRoles.includes('Controller') ? 'Controller' : enabledRoles[0]) as ProcessingRole,
         dataProtectionContact: '',
         controllerContactDetails: '',
         purpose: '',
         processorAndControllerDetails: '',
         categoriesOfProcessing: [],
-        legalBasis: 'Legitimate Interest',
+        legalBasis: (enabledLegalBases[0] || '') as LegalBasis,
         retentionPeriod: '3 Years',
         hasRetentionPolicy: true,
         personalDataCategories: allPersonalData,
         involvesHighRiskData: hasHighRisk,
         transferSafeguards: 'EU Standard Contractual Clauses (SCCs)',
-        toms: ['Activity logging', 'Encryption at rest', 'Encryption in transit', 'Role Based Access Controls'],
+        toms: ['Activity logging', 'Encryption at rest', 'Encryption in transit', 'Role Based Access Controls']
+          .filter(item => enabledToms.includes(item)),
         tomsOther: '',
-        tspStatus: 'Yes',
+        tspStatus: (enabledTspStatuses.includes('Yes') ? 'Yes' : enabledTspStatuses[0]) as any,
         tspJustification: '',
         dataSubjectCategories: defaultCategories,
         dataSubjectPersonalDataMap: defaultMap,
-        recipientCategories: ['Trimble Cloud Platform', 'Third Party Vendors'],
+        recipientCategories: [
+          enabledInternalRecipients.includes('Trimble Cloud Platform') ? 'Trimble Cloud Platform' : enabledInternalRecipients[0],
+          enabledExternalRecipients.includes('Third Party Vendors') ? 'Third Party Vendors' : enabledExternalRecipients[0],
+        ].filter(Boolean) as string[],
         specifiedTrimbleProductTeam: '',
         specifiedThirdParty: '',
         hasInternationalTransfer: 'No',
