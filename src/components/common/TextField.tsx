@@ -6,6 +6,7 @@ interface TextFieldProps extends React.InputHTMLAttributes<HTMLInputElement> {
   error?: string;
   multiline?: boolean;
   rows?: number;
+  suggestions?: readonly string[];
 }
 
 export const TextField: React.FC<TextFieldProps> = ({
@@ -14,6 +15,7 @@ export const TextField: React.FC<TextFieldProps> = ({
   error,
   multiline = false,
   rows = 3,
+  suggestions,
   className = '',
   id,
   ...props
@@ -39,7 +41,21 @@ export const TextField: React.FC<TextFieldProps> = ({
           {...(props as React.TextareaHTMLAttributes<HTMLTextAreaElement>)}
         />
       ) : (
-        <input id={inputId} className={inputClasses} {...props} />
+        <>
+          <input
+            id={inputId}
+            list={suggestions?.length && inputId ? `${inputId}-suggestions` : undefined}
+            className={inputClasses}
+            {...props}
+          />
+          {suggestions?.length && inputId ? (
+            <datalist id={`${inputId}-suggestions`}>
+              {suggestions.map(option => (
+                <option key={option} value={option} />
+              ))}
+            </datalist>
+          ) : null}
+        </>
       )}
       {error && <p className="mt-1 text-xs text-rose-600 font-medium">{error}</p>}
       {helperText && !error && <p className="mt-1 text-xs text-slate-500">{helperText}</p>}

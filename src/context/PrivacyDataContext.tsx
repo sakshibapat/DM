@@ -27,6 +27,7 @@ import {
   InventoryConfigDocument,
   InventoryOption,
   cloneDefaultInventoryConfig,
+  getOptionValues,
   mergeInventoryConfig,
 } from '../types/inventoryConfig';
 
@@ -76,6 +77,7 @@ interface PrivacyDataContextType {
   resetOptionGroup: (inventoryType: InventoryType, groupKey: string) => void;
   resetInventoryConfiguration: () => void;
   isOptionValueInUse: (inventoryType: InventoryType, value: string) => boolean;
+  getConfiguredOptions: (inventoryType: InventoryType, groupKey: string, legacyValues?: string[]) => string[];
   
   // Admin / State management
   resetToDefaultData: () => void;
@@ -847,6 +849,12 @@ export const PrivacyDataProvider: React.FC<{ children: React.ReactNode }> = ({ c
     return records.some(record => contains(record));
   };
 
+  const getConfiguredOptions = (
+    inventoryType: InventoryType,
+    groupKey: string,
+    legacyValues: string[] = []
+  ) => getOptionValues(inventoryConfig, inventoryType, groupKey, legacyValues);
+
   const resetToDefaultData = () => {
     const demoData = resetToDemoStore();
     setProcessingActivities(demoData.processingActivities);
@@ -929,6 +937,7 @@ export const PrivacyDataProvider: React.FC<{ children: React.ReactNode }> = ({ c
         resetOptionGroup,
         resetInventoryConfiguration,
         isOptionValueInUse,
+        getConfiguredOptions,
         resetToDefaultData,
         exportDataJSON,
         importDataJSON,

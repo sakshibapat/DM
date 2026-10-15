@@ -38,6 +38,7 @@ export const RecordFormModal: React.FC<RecordFormModalProps> = ({
     entities,
     addRecord,
     updateRecord,
+    getConfiguredOptions,
   } = usePrivacyData();
 
   const isEdit = Boolean(recordIdToEdit);
@@ -84,6 +85,15 @@ export const RecordFormModal: React.FC<RecordFormModalProps> = ({
   });
 
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
+  const statusOptions = getConfiguredOptions(inventoryType, 'statuses', [formData.status || '']);
+  const tspCategoryOptions = getConfiguredOptions('tspReferences', 'categories', [formData.category || '']);
+  const vendorDpaStatusOptions = getConfiguredOptions('vendors', 'dpaStatuses', [formData.dpaStatus || '']);
+  const vendorCertificationOptions = getConfiguredOptions(
+    'vendors',
+    'certifications',
+    formData.securityCertifications || []
+  );
+  const entityJurisdictionOptions = getConfiguredOptions('entities', 'jurisdictions', [formData.jurisdiction || '']);
 
   // Populate form if editing
   useEffect(() => {
@@ -245,7 +255,7 @@ export const RecordFormModal: React.FC<RecordFormModalProps> = ({
               <div>
                 <Select
                   label="Approval Status"
-                  options={['Approved', 'Under Review', 'Draft', 'Archived']}
+                  options={statusOptions}
                   value={formData.status}
                   onChange={e => setFormData({ ...formData, status: e.target.value as StatusType })}
                 />
@@ -361,6 +371,7 @@ export const RecordFormModal: React.FC<RecordFormModalProps> = ({
                   placeholder="e.g., SaaS CRM, Cloud Infrastructure, Payment API"
                   value={formData.category}
                   onChange={e => setFormData({ ...formData, category: e.target.value })}
+                  suggestions={tspCategoryOptions}
                 />
                 <TextField
                   label="Version or Subscription Plan"
@@ -414,7 +425,7 @@ export const RecordFormModal: React.FC<RecordFormModalProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <Select
                   label="DPA Status"
-                  options={['Signed', 'In Review', 'Not Required', 'Expired']}
+                  options={vendorDpaStatusOptions}
                   value={formData.dpaStatus}
                   onChange={e => setFormData({ ...formData, dpaStatus: e.target.value as DpaStatus })}
                 />
@@ -435,7 +446,7 @@ export const RecordFormModal: React.FC<RecordFormModalProps> = ({
                 label="Security & Privacy Certifications"
                 selectedValues={formData.securityCertifications || []}
                 onChange={vals => setFormData({ ...formData, securityCertifications: vals })}
-                presetOptions={['ISO 27001', 'SOC 2 Type II', 'PCI-DSS Level 1', 'ISO 27018', 'EU-US Data Privacy Framework']}
+                presetOptions={vendorCertificationOptions}
               />
             </div>
           )}
@@ -451,6 +462,7 @@ export const RecordFormModal: React.FC<RecordFormModalProps> = ({
                   placeholder="e.g., EU - Netherlands, US - Delaware"
                   value={formData.jurisdiction}
                   onChange={e => setFormData({ ...formData, jurisdiction: e.target.value })}
+                  suggestions={entityJurisdictionOptions}
                 />
                 <TextField
                   label="Registration Number"
