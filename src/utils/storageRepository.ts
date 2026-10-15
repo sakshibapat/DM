@@ -14,8 +14,16 @@ import {
   initialEntities,
   initialAuditLogs,
 } from '../data/mockSeedData';
+import {
+  ConfigurationAuditEntry,
+  InventoryConfigDocument,
+  cloneDefaultInventoryConfig,
+  mergeInventoryConfig,
+} from '../types/inventoryConfig';
 
 const LOCAL_STORAGE_KEY = 'privamap_data_store_v1';
+const INVENTORY_CONFIG_STORAGE_KEY = 'privamap_inventory_config_v1';
+const CONFIG_AUDIT_STORAGE_KEY = 'privamap_config_audit_v1';
 
 export interface DataStore {
   processingActivities: ProcessingActivity[];
@@ -101,4 +109,47 @@ export const resetToDemoStore = (): DataStore => {
  */
 export const clearDataStore = (): void => {
   localStorage.removeItem(LOCAL_STORAGE_KEY);
+};
+
+export const loadInventoryConfig = (): InventoryConfigDocument => {
+  try {
+    const saved = localStorage.getItem(INVENTORY_CONFIG_STORAGE_KEY);
+    return mergeInventoryConfig(saved ? JSON.parse(saved) : null);
+  } catch (error) {
+    console.error('Failed to parse saved inventory configuration', error);
+    return cloneDefaultInventoryConfig();
+  }
+};
+
+export const saveInventoryConfig = (config: InventoryConfigDocument): void => {
+  try {
+    localStorage.setItem(INVENTORY_CONFIG_STORAGE_KEY, JSON.stringify(config));
+  } catch (error) {
+    console.error('Failed to save inventory configuration', error);
+  }
+};
+
+export const resetInventoryConfigStore = (): InventoryConfigDocument => {
+  const defaults = cloneDefaultInventoryConfig();
+  saveInventoryConfig(defaults);
+  return defaults;
+};
+
+export const loadConfigurationAuditLog = (): ConfigurationAuditEntry[] => {
+  try {
+    const saved = localStorage.getItem(CONFIG_AUDIT_STORAGE_KEY);
+    const parsed = saved ? JSON.parse(saved) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (error) {
+    console.error('Failed to parse configuration audit log', error);
+    return [];
+  }
+};
+
+export const saveConfigurationAuditLog = (entries: ConfigurationAuditEntry[]): void => {
+  try {
+    localStorage.setItem(CONFIG_AUDIT_STORAGE_KEY, JSON.stringify(entries));
+  } catch (error) {
+    console.error('Failed to save configuration audit log', error);
+  }
 };

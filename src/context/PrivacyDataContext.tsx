@@ -16,7 +16,19 @@ import {
   loadDataStore,
   saveDataStore,
   resetToDemoStore,
+  loadInventoryConfig,
+  saveInventoryConfig,
+  resetInventoryConfigStore,
+  loadConfigurationAuditLog,
+  saveConfigurationAuditLog,
 } from '../utils/storageRepository';
+import {
+  ConfigurationAuditEntry,
+  InventoryConfigDocument,
+  InventoryOption,
+  cloneDefaultInventoryConfig,
+  mergeInventoryConfig,
+} from '../types/inventoryConfig';
 
 interface PrivacyDataContextType {
   processingActivities: ProcessingActivity[];
@@ -56,6 +68,14 @@ interface PrivacyDataContextType {
   // Attention & Metrics
   attentionItems: AttentionItem[];
   metrics: DataMappingMetrics;
+
+  // Runtime inventory option configuration
+  inventoryConfig: InventoryConfigDocument;
+  configurationAuditLog: ConfigurationAuditEntry[];
+  updateOptionGroup: (inventoryType: InventoryType, groupKey: string, options: InventoryOption[]) => void;
+  resetOptionGroup: (inventoryType: InventoryType, groupKey: string) => void;
+  resetInventoryConfiguration: () => void;
+  isOptionValueInUse: (inventoryType: InventoryType, value: string) => boolean;
   
   // Admin / State management
   resetToDefaultData: () => void;
@@ -80,6 +100,10 @@ export const PrivacyDataProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const [vendors, setVendors] = useState<Vendor[]>(initialData.vendors);
   const [entities, setEntities] = useState<Entity[]>(initialData.entities);
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>(initialData.auditLogs);
+  const [inventoryConfig, setInventoryConfig] = useState<InventoryConfigDocument>(() => loadInventoryConfig());
+  const [configurationAuditLog, setConfigurationAuditLog] = useState<ConfigurationAuditEntry[]>(
+    () => loadConfigurationAuditLog()
+  );
 
   // Save state to Local Storage
   useEffect(() => {
@@ -93,6 +117,14 @@ export const PrivacyDataProvider: React.FC<{ children: React.ReactNode }> = ({ c
     };
     saveDataStore(storePayload);
   }, [processingActivities, tspReferences, assets, vendors, entities, auditLogs]);
+
+  useEffect(() => {
+    saveInventoryConfig(inventoryConfig);
+  }, [inventoryConfig]);
+
+  useEffect(() => {
+    saveConfigurationAuditLog(configurationAuditLog);
+  }, [configurationAuditLog]);
 
   // Compute Bidirectional Relationships dynamically
   const getRelatedRecords = useMemo(() => {
@@ -719,6 +751,102 @@ export const PrivacyDataProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
   };
 
+  const appendConfigurationAudit = (
+    inventoryType: InventoryType,
+    optionGroupKey: string,
+    action: ConfigurationAuditEntry['action'],
+    details: string
+  ) => {
+    setConfigurationAuditLog(previous => [
+      {
+        id: `CFG-${Date.now()}`,
+        timestamp: new Date().toISOString(),
+        user: 'privacy.admin@privacorp.com',
+        inventoryType,
+        optionGroupKey,
+        action,
+        details,
+      },
+      ...previous,
+    ]);
+  };
+
+  const updateOptionGroup = (
+    inventoryType: InventoryType,
+    groupKey: string,
+    options: InventoryOption[]
+  ) => {
+    setInventoryConfig(previous => ({
+      ...previous,
+      inventories: {
+        ...previous.inventories,
+        [inventoryType]: {
+          ...previous.inventories[inventoryType],
+          optionGroups: {
+            ...previous.inventories[inventoryType].optionGroups,
+            [groupKey]: {
+              ...previous.inventories[inventoryType].optionGroups[groupKey],
+              options,
+            },
+          },
+        },
+      },
+    }));
+    appendConfigurationAudit(
+      inventoryType,
+      groupKey,
+      'Updated',
+      `Updated ${options.length} configured option(s).`
+    );
+  };
+
+  const resetOptionGroup = (inventoryType: InventoryType, groupKey: string) => {
+    const defaultGroup =
+      cloneDefaultInventoryConfig().inventories[inventoryType].optionGroups[groupKey];
+    if (!defaultGroup) return;
+    setInventoryConfig(previous => ({
+      ...previous,
+      inventories: {
+        ...previous.inventories,
+        [inventoryType]: {
+          ...previous.inventories[inventoryType],
+          optionGroups: {
+            ...previous.inventories[inventoryType].optionGroups,
+            [groupKey]: defaultGroup,
+          },
+        },
+      },
+    }));
+    appendConfigurationAudit(inventoryType, groupKey, 'Reset', 'Restored the default option list.');
+  };
+
+  const resetInventoryConfiguration = () => {
+    setInventoryConfig(resetInventoryConfigStore());
+    (Object.keys(inventoryConfig.inventories) as InventoryType[]).forEach(inventoryType => {
+      appendConfigurationAudit(inventoryType, '*', 'Reset', 'Restored all inventory option defaults.');
+    });
+  };
+
+  const isOptionValueInUse = (inventoryType: InventoryType, value: string): boolean => {
+    const records: PrivacyRecord[] =
+      inventoryType === 'processingActivities'
+        ? processingActivities
+        : inventoryType === 'tspReferences'
+        ? tspReferences
+        : inventoryType === 'assets'
+        ? assets
+        : inventoryType === 'vendors'
+        ? vendors
+        : entities;
+
+    const contains = (input: unknown): boolean => {
+      if (Array.isArray(input)) return input.some(contains);
+      if (input && typeof input === 'object') return Object.values(input).some(contains);
+      return input === value;
+    };
+    return records.some(record => contains(record));
+  };
+
   const resetToDefaultData = () => {
     const demoData = resetToDemoStore();
     setProcessingActivities(demoData.processingActivities);
@@ -731,7 +859,7 @@ export const PrivacyDataProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
   const exportDataJSON = () => {
     const payload = {
-      version: '1.0',
+      version: '2.0',
       exportTimestamp: new Date().toISOString(),
       processingActivities,
       tspReferences,
@@ -739,6 +867,8 @@ export const PrivacyDataProvider: React.FC<{ children: React.ReactNode }> = ({ c
       vendors,
       entities,
       auditLogs,
+      inventoryConfig,
+      configurationAuditLog,
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -759,6 +889,10 @@ export const PrivacyDataProvider: React.FC<{ children: React.ReactNode }> = ({ c
         setVendors(parsed.vendors);
         if (parsed.entities) setEntities(parsed.entities);
         if (parsed.auditLogs) setAuditLogs(parsed.auditLogs);
+        if (parsed.inventoryConfig) setInventoryConfig(mergeInventoryConfig(parsed.inventoryConfig));
+        if (Array.isArray(parsed.configurationAuditLog)) {
+          setConfigurationAuditLog(parsed.configurationAuditLog);
+        }
         return true;
       }
     } catch (e) {
@@ -789,6 +923,12 @@ export const PrivacyDataProvider: React.FC<{ children: React.ReactNode }> = ({ c
         getRelatedRecords,
         attentionItems,
         metrics,
+        inventoryConfig,
+        configurationAuditLog,
+        updateOptionGroup,
+        resetOptionGroup,
+        resetInventoryConfiguration,
+        isOptionValueInUse,
         resetToDefaultData,
         exportDataJSON,
         importDataJSON,
