@@ -121,6 +121,7 @@ const backup = createBackupDocument(
     vendors: [],
     entities: [],
     auditLogs: [],
+    privacyAssessments: [],
   },
   customized,
   [],
