@@ -26,7 +26,6 @@ import {
   ShieldCheck,
   Users,
   Briefcase,
-  Plus,
   Trash2,
   Tag,
   UserCheck,
@@ -148,8 +147,6 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
     category: string;
     itemCount: number;
   } | null>(null);
-
-  const [customDataSubjectInput, setCustomDataSubjectInput] = useState('');
 
   // Populate form if editing
   useEffect(() => {
@@ -361,12 +358,6 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
       personalDataCategories: allSelected,
       involvesHighRiskData: hasHighRisk,
     }));
-  };
-
-  const handleAddCustomDataSubject = () => {
-    if (!customDataSubjectInput.trim()) return;
-    executeAddDataSubjectCategory(customDataSubjectInput.trim());
-    setCustomDataSubjectInput('');
   };
 
   // Recipient Category Toggle Handler
@@ -1235,31 +1226,6 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                   })}
                 </div>
 
-                {/* Custom Category Input Option */}
-                <div className="pt-2 border-t border-slate-200 flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={customDataSubjectInput}
-                    onChange={e => setCustomDataSubjectInput(e.target.value)}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        handleAddCustomDataSubject();
-                      }
-                    }}
-                    placeholder="Add custom Data Subject category (e.g., Job Applicants, Minors)..."
-                    className="flex-1 px-3 py-1.5 text-xs bg-white border border-slate-300 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-indigo-500/30"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleAddCustomDataSubject}
-                    disabled={!customDataSubjectInput.trim()}
-                    className="px-3 py-1.5 bg-slate-800 text-white hover:bg-slate-900 rounded-lg text-xs font-semibold disabled:opacity-40 transition flex items-center gap-1"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    Add Group
-                  </button>
-                </div>
               </div>
 
               {/* High-Risk Personal Data Warning Badge */}
