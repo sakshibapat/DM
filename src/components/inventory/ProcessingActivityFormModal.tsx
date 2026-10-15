@@ -91,7 +91,6 @@ export const FORM_STEPS = [
   { id: 6, name: 'Retention & Legal Basis', icon: Clock, desc: 'Art 6 legal basis & schedule' },
   { id: 7, name: 'Security Measures', icon: Lock, desc: 'TOMs & encryption controls' },
   { id: 8, name: 'Related Inventories', icon: Layers, desc: 'Assets, Vendors, & Entities' },
-  { id: 9, name: 'Review', icon: CheckCircle2, desc: 'Validation & final submission' },
 ];
 
 export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalProps> = ({
@@ -1853,7 +1852,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                           No defined data retention policy.
                         </span>
                         <p className="text-[11px] text-rose-800 mt-0.5">
-                          This processing activity record can be saved as a draft, but operating without a retention policy violates data minimization rules (GDPR Art. 5(1)(e)). This warning will be highlighted in Review and Records Requiring Attention.
+                          This processing activity record can be saved as a draft, but operating without a retention policy violates data minimization rules (GDPR Art. 5(1)(e)). This warning will be highlighted in Records Requiring Attention.
                         </p>
                       </div>
                     </div>
@@ -2383,10 +2382,10 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
           </div>
 
           <div className="flex items-center gap-2">
-            {currentStep < 9 ? (
+            {currentStep < 8 ? (
               <button
                 type="button"
-                onClick={() => setCurrentStep(prev => Math.min(9, prev + 1))}
+                onClick={() => setCurrentStep(prev => Math.min(8, prev + 1))}
                 className="px-4 py-2 rounded-md bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 transition flex items-center gap-1.5 shadow-sm"
               >
                 Next Section
