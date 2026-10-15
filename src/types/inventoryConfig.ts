@@ -231,3 +231,12 @@ export const validateInventoryOptions = (options: InventoryOption[]): string | n
   }
   return null;
 };
+
+export const recordsContainOptionValue = (records: unknown[], value: string): boolean => {
+  const contains = (input: unknown): boolean => {
+    if (Array.isArray(input)) return input.some(contains);
+    if (input && typeof input === 'object') return Object.values(input).some(contains);
+    return input === value;
+  };
+  return records.some(contains);
+};

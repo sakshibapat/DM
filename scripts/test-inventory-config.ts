@@ -3,10 +3,14 @@ import {
   cloneDefaultInventoryConfig,
   getOptionValues,
   mergeInventoryConfig,
+  recordsContainOptionValue,
   validateInventoryOptions,
 } from '../src/types/inventoryConfig';
 import {
+  BACKUP_SCHEMA_VERSION,
+  createBackupDocument,
   loadInventoryConfig,
+  migrateBackupDocument,
   resetInventoryConfigStore,
   saveInventoryConfig,
 } from '../src/utils/storageRepository';
@@ -59,6 +63,16 @@ assert.deepEqual(
   ['Custom Managed Type', 'Legacy Type'],
   'legacy values should remain available while editing existing records'
 );
+assert.equal(
+  recordsContainOptionValue([{ details: { assetType: 'Legacy Type' } }], 'Legacy Type'),
+  true,
+  'nested record fields should protect in-use options from deletion'
+);
+assert.equal(
+  recordsContainOptionValue([{ details: { assetType: 'Other Type' } }], 'Legacy Type'),
+  false,
+  'unused options should remain removable'
+);
 assert.ok(
   merged.inventories.assets.optionGroups.locations.options.length > 0,
   'missing option groups should migrate from defaults'
@@ -97,6 +111,47 @@ assert.deepEqual(
   ),
   reordered.map(option => option.value),
   'configured order should be preserved'
+);
+
+const backup = createBackupDocument(
+  {
+    processingActivities: [],
+    tspReferences: [],
+    assets: [],
+    vendors: [],
+    entities: [],
+    auditLogs: [],
+  },
+  customized,
+  [],
+  '2026-01-01T00:00:00.000Z'
+);
+assert.equal(backup.schemaVersion, BACKUP_SCHEMA_VERSION);
+assert.equal(backup.inventoryConfigVersion, customized.version);
+
+const migratedLegacyBackup = migrateBackupDocument({
+  version: '1.0',
+  processingActivities: [],
+  assets: [],
+  vendors: [],
+});
+assert.ok(migratedLegacyBackup, 'legacy exports should migrate');
+assert.equal(migratedLegacyBackup.schemaVersion, BACKUP_SCHEMA_VERSION);
+assert.deepEqual(migratedLegacyBackup.tspReferences, []);
+assert.ok(
+  migratedLegacyBackup.inventoryConfig.inventories.entities.optionGroups.jurisdictions.options.length >
+    0,
+  'legacy exports should receive the default inventory configuration'
+);
+assert.equal(
+  migrateBackupDocument({
+    schemaVersion: BACKUP_SCHEMA_VERSION + 1,
+    processingActivities: [],
+    assets: [],
+    vendors: [],
+  }),
+  null,
+  'unsupported future backup schemas should be rejected'
 );
 
 console.log('Inventory configuration tests passed.');

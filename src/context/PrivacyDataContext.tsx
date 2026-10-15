@@ -21,6 +21,8 @@ import {
   resetInventoryConfigStore,
   loadConfigurationAuditLog,
   saveConfigurationAuditLog,
+  createBackupDocument,
+  migrateBackupDocument,
 } from '../utils/storageRepository';
 import {
   ConfigurationAuditEntry,
@@ -28,7 +30,7 @@ import {
   InventoryOption,
   cloneDefaultInventoryConfig,
   getOptionValues,
-  mergeInventoryConfig,
+  recordsContainOptionValue,
 } from '../types/inventoryConfig';
 
 interface PrivacyDataContextType {
@@ -841,12 +843,7 @@ export const PrivacyDataProvider: React.FC<{ children: React.ReactNode }> = ({ c
         ? vendors
         : entities;
 
-    const contains = (input: unknown): boolean => {
-      if (Array.isArray(input)) return input.some(contains);
-      if (input && typeof input === 'object') return Object.values(input).some(contains);
-      return input === value;
-    };
-    return records.some(record => contains(record));
+    return recordsContainOptionValue(records, value);
   };
 
   const getConfiguredOptions = (
@@ -866,18 +863,18 @@ export const PrivacyDataProvider: React.FC<{ children: React.ReactNode }> = ({ c
   };
 
   const exportDataJSON = () => {
-    const payload = {
-      version: '2.0',
-      exportTimestamp: new Date().toISOString(),
+    const payload = createBackupDocument(
+      {
       processingActivities,
       tspReferences,
       assets,
       vendors,
       entities,
       auditLogs,
+      },
       inventoryConfig,
-      configurationAuditLog,
-    };
+      configurationAuditLog
+    );
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -889,18 +886,16 @@ export const PrivacyDataProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
   const importDataJSON = (jsonString: string): boolean => {
     try {
-      const parsed = JSON.parse(jsonString);
-      if (parsed.processingActivities && parsed.assets && parsed.vendors) {
-        setProcessingActivities(parsed.processingActivities);
-        if (parsed.tspReferences) setTspReferences(parsed.tspReferences);
-        setAssets(parsed.assets);
-        setVendors(parsed.vendors);
-        if (parsed.entities) setEntities(parsed.entities);
-        if (parsed.auditLogs) setAuditLogs(parsed.auditLogs);
-        if (parsed.inventoryConfig) setInventoryConfig(mergeInventoryConfig(parsed.inventoryConfig));
-        if (Array.isArray(parsed.configurationAuditLog)) {
-          setConfigurationAuditLog(parsed.configurationAuditLog);
-        }
+      const backup = migrateBackupDocument(JSON.parse(jsonString));
+      if (backup) {
+        setProcessingActivities(backup.processingActivities);
+        setTspReferences(backup.tspReferences);
+        setAssets(backup.assets);
+        setVendors(backup.vendors);
+        setEntities(backup.entities);
+        setAuditLogs(backup.auditLogs);
+        setInventoryConfig(backup.inventoryConfig);
+        setConfigurationAuditLog(backup.configurationAuditLog);
         return true;
       }
     } catch (e) {
