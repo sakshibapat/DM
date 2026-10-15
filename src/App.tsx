@@ -9,6 +9,7 @@ import { RecordFormModal } from './components/inventory/RecordFormModal';
 import { DataFlowsView } from './components/flows/DataFlowsView';
 import { FutureModulePlaceholder } from './components/future/FutureModulePlaceholder';
 import { InventoryManagerView } from './components/settings/InventoryManagerView';
+import { AssessmentsView } from './components/assessments/AssessmentsView';
 import { InventoryType } from './types/privacy';
 
 const MainAppContent: React.FC = () => {
@@ -72,6 +73,10 @@ const MainAppContent: React.FC = () => {
 
     if (activeNav === 'inventory-manager') {
       return <InventoryManagerView />;
+    }
+
+    if (activeNav === 'privacyAssessments' || activeNav === 'future-assessments') {
+      return <AssessmentsView />;
     }
 
     if (activeNav.startsWith('future-')) {

@@ -128,8 +128,9 @@ export const Header: React.FC<HeaderProps> = ({ onOpenCreateModal }) => {
         return 'Data Mapping / Legal Entities Inventory';
       case 'inventory-manager':
         return 'Administration / Inventory Manager';
+      case 'privacyAssessments':
       case 'future-assessments':
-        return 'Assessments & DPIAs Module';
+        return 'Privacy Assessments';
       case 'future-risks':
         return 'Risk Management Module';
       case 'future-incidents':

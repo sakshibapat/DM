@@ -6,6 +6,7 @@ import {
   Entity,
   AuditLogEntry,
 } from '../types/privacy';
+import { PrivacyAssessment } from '../types/assessment';
 import {
   initialProcessingActivities,
   initialTSPReferences,
@@ -14,6 +15,7 @@ import {
   initialEntities,
   initialAuditLogs,
 } from '../data/mockSeedData';
+import { initialPrivacyAssessments } from '../data/assessmentSeedData';
 import {
   ConfigurationAuditEntry,
   InventoryConfigDocument,
@@ -34,6 +36,7 @@ export interface DataStore {
   vendors: Vendor[];
   entities: Entity[];
   auditLogs: AuditLogEntry[];
+  privacyAssessments: PrivacyAssessment[];
 }
 
 export interface PrivaMapBackup extends DataStore {
@@ -105,6 +108,9 @@ export const migrateBackupDocument = (input: unknown): PrivaMapBackup | null => 
       vendors: input.vendors as Vendor[],
       entities: Array.isArray(input.entities) ? (input.entities as Entity[]) : [],
       auditLogs: Array.isArray(input.auditLogs) ? (input.auditLogs as AuditLogEntry[]) : [],
+      privacyAssessments: Array.isArray(input.privacyAssessments)
+        ? (input.privacyAssessments as PrivacyAssessment[])
+        : initialPrivacyAssessments,
     },
     inventoryConfig,
     Array.isArray(input.configurationAuditLog)
@@ -136,6 +142,9 @@ export const loadDataStore = (): DataStore => {
           vendors: parsed.vendors,
           entities: parsed.entities || [],
           auditLogs: parsed.auditLogs || [],
+          privacyAssessments: Array.isArray(parsed.privacyAssessments)
+            ? parsed.privacyAssessments
+            : initialPrivacyAssessments,
         };
       }
     } catch (e) {
@@ -151,6 +160,7 @@ export const loadDataStore = (): DataStore => {
     vendors: initialVendors,
     entities: initialEntities,
     auditLogs: initialAuditLogs,
+    privacyAssessments: initialPrivacyAssessments,
   };
   
   localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(seedStore));
@@ -179,6 +189,7 @@ export const resetToDemoStore = (): DataStore => {
     vendors: initialVendors,
     entities: initialEntities,
     auditLogs: initialAuditLogs,
+    privacyAssessments: initialPrivacyAssessments,
   };
   localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(seedStore));
   return seedStore;
