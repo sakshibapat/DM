@@ -220,3 +220,14 @@ export const getOptionValues = (
     .map(option => option.value);
   return Array.from(new Set([...enabled, ...legacyValues.filter(Boolean)]));
 };
+
+export const validateInventoryOptions = (options: InventoryOption[]): string | null => {
+  if (options.some(option => !option.value.trim())) return 'Options cannot be empty.';
+  const seen = new Set<string>();
+  for (const option of options) {
+    const normalized = option.value.trim().toLowerCase();
+    if (seen.has(normalized)) return 'Option values must be unique.';
+    seen.add(normalized);
+  }
+  return null;
+};

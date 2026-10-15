@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { usePrivacyData } from '../../context/PrivacyDataContext';
 import { InventoryType } from '../../types/privacy';
-import { InventoryOption } from '../../types/inventoryConfig';
+import { InventoryOption, validateInventoryOptions } from '../../types/inventoryConfig';
 
 const INVENTORY_ORDER: InventoryType[] = [
   'processingActivities',
@@ -46,7 +46,7 @@ export const InventoryManagerView: React.FC = () => {
   useEffect(() => {
     const firstKey = Object.keys(inventoryConfig.inventories[inventoryType].optionGroups)[0];
     setGroupKey(firstKey);
-  }, [inventoryType, inventoryConfig.inventories]);
+  }, [inventoryType]);
 
   useEffect(() => {
     if (!activeGroup) return;
@@ -142,20 +142,9 @@ export const InventoryManagerView: React.FC = () => {
       value: option.value.trim(),
       label: option.value.trim(),
     }));
-    if (normalized.some(option => !option.value)) {
-      window.alert('Options cannot be empty.');
-      return;
-    }
-    const seen = new Set<string>();
-    if (
-      normalized.some(option => {
-        const key = option.value.toLowerCase();
-        if (seen.has(key)) return true;
-        seen.add(key);
-        return false;
-      })
-    ) {
-      window.alert('Option values must be unique.');
+    const validationError = validateInventoryOptions(normalized);
+    if (validationError) {
+      window.alert(validationError);
       return;
     }
     updateOptionGroup(inventoryType, groupKey, normalized);
