@@ -42,6 +42,8 @@ import {
   StatusType,
   CONTROLLER_LEGAL_BASIS_OPTIONS,
   DestinationCountryTransfer,
+  usesControllerWizardOptions,
+  usesProcessorWizardOptions,
 } from '../../types/privacy';
 import { TextField } from '../common/TextField';
 import { Select } from '../common/Select';
@@ -461,21 +463,15 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
     return getInternationalTransferWarning(formData);
   }, [formData]);
 
-  // Is Processor helper
-  const isProcessorRole = (r?: ProcessingRole) =>
-    r === 'Processor (B2B sales only)' ||
-    r === 'Processor (but including B2C sales)' ||
-    r === 'Processor';
-
-  const isControllerRole = (r?: ProcessingRole) => r === 'Controller' || r === 'Joint Controller';
-
   // Role switch handler with warning confirmation
   const handleRoleChangeAttempt = (newRole: ProcessingRole) => {
     const currentRole = formData.role;
     if (currentRole === newRole) return;
 
-    const switchingFromControllerToProcessor = isControllerRole(currentRole) && isProcessorRole(newRole);
-    const switchingFromProcessorToController = isProcessorRole(currentRole) && isControllerRole(newRole);
+    const leavingControllerOptions =
+      usesControllerWizardOptions(currentRole) && usesProcessorWizardOptions(newRole);
+    const leavingProcessorOptions =
+      usesProcessorWizardOptions(currentRole) && usesControllerWizardOptions(newRole);
 
     const hasControllerSpecificData = Boolean(formData.purpose || formData.controllerContactDetails);
     const hasProcessorSpecificData = Boolean(
@@ -484,13 +480,11 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
     );
 
     if (
-      (switchingFromControllerToProcessor && hasControllerSpecificData) ||
-      (switchingFromProcessorToController && hasProcessorSpecificData)
+      (leavingControllerOptions && hasControllerSpecificData) ||
+      (leavingProcessorOptions && hasProcessorSpecificData)
     ) {
-      // Trigger confirmation modal
       setPendingRoleSwitch(newRole);
     } else {
-      // Direct update
       applyRoleChange(newRole);
     }
   };
@@ -499,12 +493,10 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
     setFormData(prev => {
       const updated = { ...prev, role: newRole };
 
-      if (isProcessorRole(newRole)) {
-        // Switching to processor: clear controller specific fields
+      if (usesProcessorWizardOptions(newRole) && usesControllerWizardOptions(prev.role)) {
         updated.purpose = '';
         updated.controllerContactDetails = '';
-      } else {
-        // Switching to controller: clear processor specific fields
+      } else if (usesControllerWizardOptions(newRole) && usesProcessorWizardOptions(prev.role)) {
         updated.categoriesOfProcessing = [];
         updated.processorAndControllerDetails = '';
       }
@@ -555,7 +547,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
     }
 
     // Step 2: Role
-    if (isControllerRole(formData.role)) {
+    if (usesControllerWizardOptions(formData.role)) {
       if (!formData.purpose || !formData.purpose.trim()) {
         errors.push({
           id: 'err-purpose',
@@ -563,11 +555,11 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
           step: 2,
           stepName: 'Role',
           field: 'Purposes of Processing',
-          message: 'Purposes of Processing is required for Controller role',
-          description: 'Select at least one primary processing purpose under Controller responsibility.',
+          message: 'Purposes of Processing is required',
+          description: 'Select at least one primary processing purpose.',
         });
       }
-    } else if (isProcessorRole(formData.role)) {
+    } else if (usesProcessorWizardOptions(formData.role)) {
       if (!formData.categoriesOfProcessing || formData.categoriesOfProcessing.length === 0) {
         errors.push({
           id: 'err-cat-proc',
@@ -689,7 +681,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
       }
     }
 
-    if (isControllerRole(formData.role)) {
+    if (usesControllerWizardOptions(formData.role)) {
       if (!formData.legalBasis || !formData.legalBasis.trim()) {
         errors.push({
           id: 'err-legal-basis',
@@ -697,7 +689,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
           step: 6,
           stepName: 'Retention & Legal Basis',
           field: 'Art. 6 Legal Basis',
-          message: 'Art. 6 Legal Basis selection is required for Controller role',
+          message: 'Art. 6 Legal Basis selection is required',
           description: 'Select the primary lawful basis under GDPR Art. 6(1).',
         });
       } else if (formData.legalBasis === 'Legitimate Interest of the Controller' || formData.legalBasis === 'Legitimate Interest') {
@@ -794,10 +786,10 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
     if (formData.description?.trim()) score += 15;
     if (formData.owner?.trim()) score += 10;
     if (formData.role) score += 10;
-    if (isControllerRole(formData.role) ? formData.purpose : formData.categoriesOfProcessing?.length) score += 10;
+    if (usesControllerWizardOptions(formData.role) ? formData.purpose : formData.categoriesOfProcessing?.length) score += 10;
     if (formData.dataSubjectCategories?.length) score += 15;
     if (formData.retentionPolicyType === 'Custom' && formData.retentionPeriod?.trim() && formData.retentionPeriod !== 'None') score += 15;
-    if (isControllerRole(formData.role) ? formData.legalBasis : true) score += 10;
+    if (usesControllerWizardOptions(formData.role) ? formData.legalBasis : true) score += 10;
     return Math.min(100, score);
   }, [formData]);
 
@@ -1084,7 +1076,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
               </div>
 
               {/* CONTROLLER SPECIFIC REQUIREMENTS */}
-              {isControllerRole(formData.role) && (
+              {usesControllerWizardOptions(formData.role) && (
                 <div className="bg-indigo-50/40 p-5 rounded-xl border border-indigo-200/70 space-y-4 animate-in fade-in duration-200">
                   <div className="flex items-center gap-2 border-b border-indigo-100 pb-2">
                     <span className="text-xs font-bold uppercase tracking-wider text-indigo-900">
@@ -1103,7 +1095,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                       value={formData.purpose || ''}
                       onChange={e => setFormData({ ...formData, purpose: e.target.value })}
                       placeholder="-- Select Primary Purpose of Processing --"
-                      error={!formData.purpose ? 'Purpose selection is required for Controller' : undefined}
+                      error={!formData.purpose ? 'Purpose selection is required' : undefined}
                     />
                     <p className="text-[11px] text-slate-500 mt-1">
                       Select the primary business purpose defining why personal data is collected and processed.
@@ -1131,7 +1123,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
               )}
 
               {/* PROCESSOR SPECIFIC REQUIREMENTS */}
-              {isProcessorRole(formData.role) && (
+              {usesProcessorWizardOptions(formData.role) && (
                 <div className="bg-emerald-50/40 p-5 rounded-xl border border-emerald-200/70 space-y-4 animate-in fade-in duration-200">
                   <div className="flex items-center gap-2 border-b border-emerald-100 pb-2">
                     <span className="text-xs font-bold uppercase tracking-wider text-emerald-900">
@@ -1883,7 +1875,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                   </div>
                 </div>
 
-                {isControllerRole(formData.role) ? (
+                {usesControllerWizardOptions(formData.role) ? (
                   <div className="space-y-4">
                     <Select
                       label="Art. 6 Legal Basis for Controller Processing"
@@ -2286,7 +2278,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                       <span className="text-slate-800 font-medium">{formData.retentionPeriod || 'None'}</span>
                     )}
                   </div>
-                  {isControllerRole(formData.role) ? (
+                  {usesControllerWizardOptions(formData.role) ? (
                     <>
                       <div>
                         <span className="text-slate-500 font-medium">Art. 6 Legal Basis: </span>

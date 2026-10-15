@@ -947,7 +947,7 @@ export const InventoryListView: React.FC<InventoryListViewProps> = ({
                       className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                     />
                   </th>
-                  <th className="p-3.5">Name & ID</th>
+                  <th className="p-3.5">{inventoryType === 'entities' ? 'Name' : 'Name & ID'}</th>
 
                   {/* Processing Activity Specific Columns */}
                   {inventoryType === 'processingActivities' && (
@@ -995,14 +995,18 @@ export const InventoryListView: React.FC<InventoryListViewProps> = ({
                   {/* Entity Specific Columns */}
                   {inventoryType === 'entities' && (
                     <>
-                      <th className="p-3.5">Jurisdiction</th>
-                      <th className="p-3.5">Registration #</th>
-                      <th className="p-3.5">DPO Contact</th>
+                      <th className="p-3.5">LE #</th>
+                      <th className="p-3.5">Primary Operating Location</th>
+                      <th className="p-3.5">Representative Contact</th>
                     </>
                   )}
 
-                  <th className="p-3.5">Status</th>
-                  <th className="p-3.5">Last Updated</th>
+                  {inventoryType !== 'entities' && (
+                    <>
+                      <th className="p-3.5">Status</th>
+                      <th className="p-3.5">Last Updated</th>
+                    </>
+                  )}
                   <th className="p-3.5 text-right">Actions</th>
                 </tr>
               </thead>
@@ -1027,10 +1031,7 @@ export const InventoryListView: React.FC<InventoryListViewProps> = ({
 
                       {/* Name & ID */}
                       <td className="p-3.5 max-w-xs">
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-mono text-[10px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded shrink-0">
-                            {record.id}
-                          </span>
+                        {inventoryType === 'entities' ? (
                           <button
                             type="button"
                             onClick={() => setSelectedRecord({ id: record.id, type: inventoryType })}
@@ -1038,9 +1039,24 @@ export const InventoryListView: React.FC<InventoryListViewProps> = ({
                           >
                             {record.name}
                           </button>
-                        </div>
-                        {record.description && (
-                          <p className="text-[11px] text-slate-500 truncate mt-0.5">{record.description}</p>
+                        ) : (
+                          <>
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-mono text-[10px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded shrink-0">
+                                {record.id}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => setSelectedRecord({ id: record.id, type: inventoryType })}
+                                className="font-bold text-slate-900 hover:text-indigo-600 text-left truncate"
+                              >
+                                {record.name}
+                              </button>
+                            </div>
+                            {record.description && (
+                              <p className="text-[11px] text-slate-500 truncate mt-0.5">{record.description}</p>
+                            )}
+                          </>
                         )}
                       </td>
 
@@ -1189,21 +1205,29 @@ export const InventoryListView: React.FC<InventoryListViewProps> = ({
                       {/* Entity Specific Fields */}
                       {inventoryType === 'entities' && (
                         <>
-                          <td className="p-3.5 font-medium text-slate-700">{record.jurisdiction}</td>
-                          <td className="p-3.5 font-mono text-[11px] text-slate-600">{record.registrationNumber}</td>
-                          <td className="p-3.5 text-slate-700">{record.dpoContact}</td>
+                          <td className="p-3.5 font-mono text-[11px] text-slate-600">
+                            {record.registrationNumber || '—'}
+                          </td>
+                          <td className="p-3.5 font-medium text-slate-700">
+                            {record.address || record.jurisdiction || '—'}
+                          </td>
+                          <td className="p-3.5 text-slate-700">{record.dpoContact || '—'}</td>
                         </>
                       )}
 
-                      {/* Status */}
-                      <td className="p-3.5">
-                        <StatusBadge status={record.status} />
-                      </td>
+                      {inventoryType !== 'entities' && (
+                        <>
+                          {/* Status */}
+                          <td className="p-3.5">
+                            <StatusBadge status={record.status} />
+                          </td>
 
-                      {/* Last Updated */}
-                      <td className="p-3.5 text-slate-500 text-[11px]">
-                        {record.lastModifiedDate ? new Date(record.lastModifiedDate).toLocaleDateString() : 'N/A'}
-                      </td>
+                          {/* Last Updated */}
+                          <td className="p-3.5 text-slate-500 text-[11px]">
+                            {record.lastModifiedDate ? new Date(record.lastModifiedDate).toLocaleDateString() : 'N/A'}
+                          </td>
+                        </>
+                      )}
 
                       {/* Row Actions */}
                       <td className="p-3.5 text-right relative">

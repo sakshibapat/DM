@@ -22,7 +22,7 @@ import {
   Clock,
 } from 'lucide-react';
 import { usePrivacyData } from '../../context/PrivacyDataContext';
-import { InventoryType, ProcessingActivity, TSPReference, Asset, Vendor, Entity } from '../../types/privacy';
+import { InventoryType, ProcessingActivity, TSPReference, Asset, Vendor, Entity, usesControllerWizardOptions } from '../../types/privacy';
 import { StatusBadge, ClassificationBadge, DpaStatusBadge, TagChip } from '../common/Badge';
 import { DataFlowDiagram } from '../common/DataFlowDiagram';
 import { RiskWarningBanner } from '../common/RiskWarningBanner';
@@ -104,8 +104,7 @@ export const RecordDetailDrawer: React.FC<RecordDetailDrawerProps> = ({ onEditRe
       if (pa.retentionPolicyType === 'None' || !pa.hasRetentionPolicy || !pa.retentionPeriod || pa.retentionPeriod === 'None') {
         gaps.push({ title: 'No defined data retention policy.', desc: 'This processing activity operates without a formal retention schedule (GDPR Art. 5(1)(e)).', severity: 'high' });
       }
-      const isController = pa.role === 'Controller' || pa.role === 'Joint Controller';
-      if (isController) {
+      if (usesControllerWizardOptions(pa.role)) {
         if (!pa.legalBasis) {
           gaps.push({ title: 'Missing Legal Basis', desc: 'Art. 6 GDPR legal basis unassigned.', severity: 'high' });
         } else if ((pa.legalBasis === 'Legitimate Interest of the Controller' || pa.legalBasis === 'Legitimate Interest') && !pa.liaFiled) {
@@ -316,7 +315,7 @@ export const RecordDetailDrawer: React.FC<RecordDetailDrawerProps> = ({ onEditRe
                     <span className="text-[10px] font-semibold uppercase text-slate-400 tracking-wider block">
                       Art. 6 Legal Basis
                     </span>
-                    {record.role === 'Controller' || record.role === 'Joint Controller' ? (
+                    {usesControllerWizardOptions(record.role) ? (
                       <div className="space-y-1">
                         <span className="font-semibold text-slate-800 text-sm block">
                           {record.legalBasis || 'Unassigned'}

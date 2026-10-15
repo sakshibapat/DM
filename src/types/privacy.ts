@@ -26,6 +26,16 @@ export type ProcessingRole =
   | 'Processor'
   | 'Joint Controller';
 
+export const B2C_PROCESSOR_ROLE: ProcessingRole = 'Processor (but including B2C sales)';
+
+/** Controller / Joint Controller, plus Processor (including B2C) which uses the same wizard fields. */
+export const usesControllerWizardOptions = (role?: ProcessingRole): boolean =>
+  role === 'Controller' || role === 'Joint Controller' || role === B2C_PROCESSOR_ROLE;
+
+/** Processor roles that keep the processor-only wizard fields (B2B / generic Processor). */
+export const usesProcessorWizardOptions = (role?: ProcessingRole): boolean =>
+  role === 'Processor (B2B sales only)' || role === 'Processor';
+
 export const CONTROLLER_PURPOSES = [
   'Account Management - may include Entitlement/IAM',
   'AI and Machine Learning Model Development',

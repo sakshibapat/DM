@@ -10,6 +10,7 @@ import {
   AuditLogEntry,
   DataMappingMetrics,
   PrivacyRecord,
+  usesControllerWizardOptions,
 } from '../types/privacy';
 import {
   loadDataStore,
@@ -272,8 +273,7 @@ export const PrivacyDataProvider: React.FC<{ children: React.ReactNode }> = ({ c
       }
 
       // 2. Missing legal basis where required
-      const isControllerRole = pa.role === 'Controller' || pa.role === 'Joint Controller';
-      if (isControllerRole) {
+      if (usesControllerWizardOptions(pa.role)) {
         if (!pa.legalBasis || pa.legalBasis.trim() === '') {
           list.push({
             id: `att-leg-${pa.id}`,
