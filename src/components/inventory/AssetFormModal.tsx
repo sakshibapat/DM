@@ -34,15 +34,50 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
   } = usePrivacyData();
 
   const isEdit = Boolean(recordIdToEdit);
-  const managingOrganisationOptions = getConfiguredOptions('assets', 'managingOrganisations');
-  const assetTypeOptions = getConfiguredOptions('assets', 'assetTypes');
-  const hostingTypeOptions = getConfiguredOptions('assets', 'hostingTypes');
-  const hostingProviderOptions = getConfiguredOptions('assets', 'hostingProviders');
-  const locationOptions = getConfiguredOptions('assets', 'locations');
-  const statusOptions = getConfiguredOptions('assets', 'statuses');
-  const classificationOptions = getConfiguredOptions('assets', 'classifications');
-  const tomOptions = getConfiguredOptions('assets', 'toms');
-  const tspStatusOptions = getConfiguredOptions('assets', 'tspStatuses');
+  const existingAsset = isEdit ? assets.find(asset => asset.id === recordIdToEdit) : undefined;
+  const managingOrganisationOptions = getConfiguredOptions(
+    'assets',
+    'managingOrganisations',
+    existingAsset?.managingOrganisation ? [existingAsset.managingOrganisation] : []
+  );
+  const assetTypeOptions = getConfiguredOptions(
+    'assets',
+    'assetTypes',
+    existingAsset?.assetType ? [existingAsset.assetType] : []
+  );
+  const hostingTypeOptions = getConfiguredOptions(
+    'assets',
+    'hostingTypes',
+    existingAsset?.hostingType ? [existingAsset.hostingType] : []
+  );
+  const hostingProviderOptions = getConfiguredOptions(
+    'assets',
+    'hostingProviders',
+    existingAsset?.hostingProvider ? [existingAsset.hostingProvider] : []
+  );
+  const locationOptions = getConfiguredOptions(
+    'assets',
+    'locations',
+    existingAsset
+      ? [existingAsset.primaryHostingLocation, ...(existingAsset.additionalHostingLocations || [])]
+      : []
+  );
+  const statusOptions = getConfiguredOptions(
+    'assets',
+    'statuses',
+    existingAsset?.status ? [existingAsset.status] : []
+  );
+  const classificationOptions = getConfiguredOptions(
+    'assets',
+    'classifications',
+    existingAsset?.dataClassification ? [existingAsset.dataClassification] : []
+  );
+  const tomOptions = getConfiguredOptions('assets', 'toms', existingAsset?.toms || []);
+  const tspStatusOptions = getConfiguredOptions(
+    'assets',
+    'tspStatuses',
+    existingAsset?.tspStatus ? [existingAsset.tspStatus] : []
+  );
 
   // Form state fields
   const [name, setName] = useState('');
@@ -412,10 +447,9 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
                   >
                     {managingOrganisationOptions.map(org => (
                       <option key={org} value={org}>
-                        {org}
+                        {org === 'Other' ? 'Other (Custom Organisation)' : org}
                       </option>
                     ))}
-                    <option value="Other">Other (Custom Organisation)</option>
                   </select>
                 </div>
 
@@ -449,10 +483,9 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
                   >
                     {assetTypeOptions.map(t => (
                       <option key={t} value={t}>
-                        {t}
+                        {t === 'Other' ? 'Other (Custom Asset Type)' : t}
                       </option>
                     ))}
-                    <option value="Other">Other (Custom Asset Type)</option>
                   </select>
                 </div>
 
@@ -558,10 +591,9 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
                   >
                     {hostingTypeOptions.map(ht => (
                       <option key={ht} value={ht}>
-                        {ht}
+                        {ht === 'Other' ? 'Other (Custom Hosting Type)' : ht}
                       </option>
                     ))}
-                    <option value="Other">Other (Custom Hosting Type)</option>
                   </select>
                 </div>
 
@@ -595,10 +627,9 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
                   >
                     {hostingProviderOptions.map(hp => (
                       <option key={hp} value={hp}>
-                        {hp}
+                        {hp === 'Other' ? 'Other (Custom Hosting Provider)' : hp}
                       </option>
                     ))}
-                    <option value="Other">Other (Custom Hosting Provider)</option>
                   </select>
                 </div>
 
