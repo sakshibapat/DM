@@ -17,6 +17,7 @@ import {
   Layers,
   Sparkles,
   Lock,
+  Settings,
 } from 'lucide-react';
 import { usePrivacyData } from '../../context/PrivacyDataContext';
 
@@ -201,6 +202,25 @@ export const Sidebar: React.FC = () => {
               })}
             </div>
           )}
+        </div>
+
+        {/* Administration */}
+        <div>
+          <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 px-2">
+            Administration
+          </div>
+          <button
+            type="button"
+            onClick={() => setActiveNav('inventory-manager')}
+            className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-xs transition font-medium ${
+              activeNav === 'inventory-manager'
+                ? 'bg-[#c8102e] text-[#ffffff] font-semibold'
+                : 'text-slate-300 hover:bg-slate-800/50 hover:text-white'
+            }`}
+          >
+            <Settings className="w-3.5 h-3.5" />
+            <span>Inventory Manager</span>
+          </button>
         </div>
       </div>
 
