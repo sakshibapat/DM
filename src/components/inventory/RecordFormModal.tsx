@@ -38,15 +38,21 @@ export const RecordFormModal: React.FC<RecordFormModalProps> = ({
     entities,
     addRecord,
     updateRecord,
+    getConfiguredOptions,
   } = usePrivacyData();
 
   const isEdit = Boolean(recordIdToEdit);
+  const enabledStatuses = getConfiguredOptions(inventoryType, 'statuses');
+  const enabledTspCategories = getConfiguredOptions('tspReferences', 'categories');
+  const enabledVendorDpaStatuses = getConfiguredOptions('vendors', 'dpaStatuses');
+  const enabledVendorCertifications = getConfiguredOptions('vendors', 'certifications');
+  const enabledEntityJurisdictions = getConfiguredOptions('entities', 'jurisdictions');
 
   // Default initial form state
   const [formData, setFormData] = useState<any>({
     name: '',
     description: '',
-    status: 'Approved' as StatusType,
+    status: (enabledStatuses.includes('Approved') ? 'Approved' : enabledStatuses[0]) as StatusType,
     tags: [],
     // PA
     role: 'Controller' as ProcessingRole,
@@ -64,26 +70,37 @@ export const RecordFormModal: React.FC<RecordFormModalProps> = ({
     vendorIds: [],
     entityIds: [],
     // TSP
-    category: 'SaaS Application',
+    category: enabledTspCategories[0] || '',
     versionOrPlan: '',
     // Asset
     assetType: 'Database' as AssetType,
     dataClassification: 'Confidential' as DataClassification,
     hostingLocation: 'AWS US-East',
     // Vendor
-    dpaStatus: 'Signed' as DpaStatus,
+    dpaStatus: (enabledVendorDpaStatuses.includes('Signed') ? 'Signed' : enabledVendorDpaStatuses[0]) as DpaStatus,
     headquarters: 'San Francisco, CA, USA',
     contactEmail: 'privacy@vendor.com',
-    securityCertifications: ['ISO 27001', 'SOC 2 Type II'],
+    securityCertifications: ['ISO 27001', 'SOC 2 Type II'].filter(item => enabledVendorCertifications.includes(item)),
     website: '',
     // Entity
-    jurisdiction: 'EU - Netherlands',
+    jurisdiction: enabledEntityJurisdictions.includes('EU - Netherlands')
+      ? 'EU - Netherlands'
+      : enabledEntityJurisdictions[0] || '',
     registrationNumber: '',
     dpoContact: '',
     address: '',
   });
 
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
+  const statusOptions = getConfiguredOptions(inventoryType, 'statuses', isEdit ? [formData.status || ''] : []);
+  const tspCategoryOptions = getConfiguredOptions('tspReferences', 'categories', isEdit ? [formData.category || ''] : []);
+  const vendorDpaStatusOptions = getConfiguredOptions('vendors', 'dpaStatuses', isEdit ? [formData.dpaStatus || ''] : []);
+  const vendorCertificationOptions = getConfiguredOptions(
+    'vendors',
+    'certifications',
+    isEdit ? formData.securityCertifications || [] : []
+  );
+  const entityJurisdictionOptions = getConfiguredOptions('entities', 'jurisdictions', isEdit ? [formData.jurisdiction || ''] : []);
 
   // Populate form if editing
   useEffect(() => {
@@ -103,7 +120,7 @@ export const RecordFormModal: React.FC<RecordFormModalProps> = ({
       setFormData({
         name: '',
         description: '',
-        status: 'Approved',
+        status: enabledStatuses.includes('Approved') ? 'Approved' : enabledStatuses[0],
         tags: [],
         role: 'Controller',
         legalBasis: 'Legitimate Interest',
@@ -119,17 +136,20 @@ export const RecordFormModal: React.FC<RecordFormModalProps> = ({
         assetIds: [],
         vendorIds: [],
         entityIds: [],
-        category: 'SaaS Platform',
+        category: enabledTspCategories[0] || '',
         versionOrPlan: '',
         assetType: 'Database',
         dataClassification: 'Confidential',
         hostingLocation: 'AWS Cloud',
-        dpaStatus: 'Signed',
+        dpaStatus: enabledVendorDpaStatuses.includes('Signed') ? 'Signed' : enabledVendorDpaStatuses[0],
         headquarters: 'San Francisco, CA, USA',
         contactEmail: 'privacy@vendor.com',
-        securityCertifications: ['ISO 27001', 'SOC 2 Type II'],
+        securityCertifications: ['ISO 27001', 'SOC 2 Type II']
+          .filter(item => enabledVendorCertifications.includes(item)),
         website: '',
-        jurisdiction: 'EU - Netherlands',
+        jurisdiction: enabledEntityJurisdictions.includes('EU - Netherlands')
+          ? 'EU - Netherlands'
+          : enabledEntityJurisdictions[0] || '',
         registrationNumber: '',
         dpoContact: '',
         address: '',
@@ -245,7 +265,7 @@ export const RecordFormModal: React.FC<RecordFormModalProps> = ({
               <div>
                 <Select
                   label="Approval Status"
-                  options={['Approved', 'Under Review', 'Draft', 'Archived']}
+                  options={statusOptions}
                   value={formData.status}
                   onChange={e => setFormData({ ...formData, status: e.target.value as StatusType })}
                 />
@@ -361,6 +381,7 @@ export const RecordFormModal: React.FC<RecordFormModalProps> = ({
                   placeholder="e.g., SaaS CRM, Cloud Infrastructure, Payment API"
                   value={formData.category}
                   onChange={e => setFormData({ ...formData, category: e.target.value })}
+                  suggestions={tspCategoryOptions}
                 />
                 <TextField
                   label="Version or Subscription Plan"
@@ -414,7 +435,7 @@ export const RecordFormModal: React.FC<RecordFormModalProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <Select
                   label="DPA Status"
-                  options={['Signed', 'In Review', 'Not Required', 'Expired']}
+                  options={vendorDpaStatusOptions}
                   value={formData.dpaStatus}
                   onChange={e => setFormData({ ...formData, dpaStatus: e.target.value as DpaStatus })}
                 />
@@ -435,7 +456,7 @@ export const RecordFormModal: React.FC<RecordFormModalProps> = ({
                 label="Security & Privacy Certifications"
                 selectedValues={formData.securityCertifications || []}
                 onChange={vals => setFormData({ ...formData, securityCertifications: vals })}
-                presetOptions={['ISO 27001', 'SOC 2 Type II', 'PCI-DSS Level 1', 'ISO 27018', 'EU-US Data Privacy Framework']}
+                presetOptions={vendorCertificationOptions}
               />
             </div>
           )}
@@ -451,6 +472,7 @@ export const RecordFormModal: React.FC<RecordFormModalProps> = ({
                   placeholder="e.g., EU - Netherlands, US - Delaware"
                   value={formData.jurisdiction}
                   onChange={e => setFormData({ ...formData, jurisdiction: e.target.value })}
+                  suggestions={entityJurisdictionOptions}
                 />
                 <TextField
                   label="Registration Number"

@@ -20,6 +20,8 @@ export interface SecurityMeasuresSectionProps {
   onTspJustificationChange: (justification: string) => void;
   onTomsChange: (toms: string[]) => void;
   onTomsOtherChange: (otherDesc: string) => void;
+  tomOptions?: readonly string[];
+  tspStatusOptions?: readonly string[];
   readOnly?: boolean;
   className?: string;
 }
@@ -33,6 +35,8 @@ export const SecurityMeasuresSection: React.FC<SecurityMeasuresSectionProps> = (
   onTspJustificationChange,
   onTomsChange,
   onTomsOtherChange,
+  tomOptions = TOMS_OPTIONS,
+  tspStatusOptions = ['Yes', 'No', 'Pending', 'N/A'],
   readOnly = false,
   className = '',
 }) => {
@@ -40,10 +44,11 @@ export const SecurityMeasuresSection: React.FC<SecurityMeasuresSectionProps> = (
 
   // Filter options based on search query
   const filteredOptions = useMemo(() => {
-    if (!searchTerm.trim()) return TOMS_OPTIONS;
+    const options = Array.from(new Set([...tomOptions, ...toms]));
+    if (!searchTerm.trim()) return options;
     const query = searchTerm.toLowerCase();
-    return TOMS_OPTIONS.filter(opt => opt.toLowerCase().includes(query));
-  }, [searchTerm]);
+    return options.filter(opt => opt.toLowerCase().includes(query));
+  }, [searchTerm, tomOptions, toms]);
 
   const toggleTom = (option: string) => {
     if (readOnly) return;
@@ -93,7 +98,7 @@ export const SecurityMeasuresSection: React.FC<SecurityMeasuresSectionProps> = (
 
           {/* Radio Button Selector Grid */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-            {(['Yes', 'No', 'Pending', 'N/A'] as TSPStatusOption[]).map(option => {
+            {Array.from(new Set([...tspStatusOptions, tspStatus].filter(Boolean))).map(option => {
               const isSelected = tspStatus === option;
               let activeColorClasses = 'border-slate-200 bg-white hover:border-slate-300 text-slate-700';
               if (isSelected) {
@@ -113,7 +118,7 @@ export const SecurityMeasuresSection: React.FC<SecurityMeasuresSectionProps> = (
                   key={option}
                   type="button"
                   disabled={readOnly}
-                  onClick={() => onTspStatusChange(option)}
+                  onClick={() => onTspStatusChange(option as TSPStatusOption)}
                   className={`p-3 rounded-lg border text-center transition flex items-center justify-center gap-2 text-xs cursor-pointer ${activeColorClasses}`}
                 >
                   <div

@@ -74,7 +74,13 @@ export const InventoryListView: React.FC<InventoryListViewProps> = ({
     setSelectedRecord,
     getRelatedRecords,
     globalSearchQuery,
+    getConfiguredOptions,
   } = usePrivacyData();
+  const configuredStatuses = getConfiguredOptions(inventoryType, 'statuses');
+  const configuredPurposes = getConfiguredOptions('processingActivities', 'controllerPurposes');
+  const configuredDataSubjects = getConfiguredOptions('processingActivities', 'dataSubjectCategories');
+  const configuredPersonalData = getConfiguredOptions('processingActivities', 'personalDataItems');
+  const configuredToms = getConfiguredOptions(inventoryType, 'toms');
 
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -562,7 +568,7 @@ export const InventoryListView: React.FC<InventoryListViewProps> = ({
 
           {/* Status Filters */}
           <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-md text-xs">
-            {['all', 'Approved', 'Under Review', 'Draft'].map(status => (
+            {['all', ...configuredStatuses].map(status => (
               <button
                 key={status}
                 type="button"
@@ -747,7 +753,7 @@ export const InventoryListView: React.FC<InventoryListViewProps> = ({
                   className="w-full bg-white border border-slate-300 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-indigo-500"
                 >
                   <option value="all">All Purposes</option>
-                  {CONTROLLER_PURPOSES.map(p => (
+                  {configuredPurposes.map(p => (
                     <option key={p} value={p}>{p}</option>
                   ))}
                 </select>
@@ -767,7 +773,7 @@ export const InventoryListView: React.FC<InventoryListViewProps> = ({
                   className="w-full bg-white border border-slate-300 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-indigo-500"
                 >
                   <option value="all">All Subject Categories</option>
-                  {DATA_SUBJECT_CATEGORIES.map(cat => (
+                  {configuredDataSubjects.map(cat => (
                     <option key={cat} value={cat}>{cat}</option>
                   ))}
                 </select>
@@ -782,7 +788,7 @@ export const InventoryListView: React.FC<InventoryListViewProps> = ({
                   className="w-full bg-white border border-slate-300 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-indigo-500"
                 >
                   <option value="all">All Personal Data Items</option>
-                  {CONTROLLED_PERSONAL_DATA_ITEMS.slice(0, 20).map(item => (
+                  {configuredPersonalData.slice(0, 20).map(item => (
                     <option key={item} value={item}>{item}</option>
                   ))}
                 </select>
@@ -915,7 +921,7 @@ export const InventoryListView: React.FC<InventoryListViewProps> = ({
                   className="w-full bg-white border border-slate-300 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-indigo-500"
                 >
                   <option value="all">All Security Standards</option>
-                  {TOMS_OPTIONS.map(tom => (
+                  {configuredToms.map(tom => (
                     <option key={tom} value={tom}>{tom}</option>
                   ))}
                 </select>

@@ -30,31 +30,84 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
     tspReferences,
     addRecord,
     updateRecord,
+    getConfiguredOptions,
   } = usePrivacyData();
 
   const isEdit = Boolean(recordIdToEdit);
+  const existingAsset = isEdit ? assets.find(asset => asset.id === recordIdToEdit) : undefined;
+  const managingOrganisationOptions = getConfiguredOptions(
+    'assets',
+    'managingOrganisations',
+    existingAsset?.managingOrganisation ? [existingAsset.managingOrganisation] : []
+  );
+  const assetTypeOptions = getConfiguredOptions(
+    'assets',
+    'assetTypes',
+    existingAsset?.assetType ? [existingAsset.assetType] : []
+  );
+  const hostingTypeOptions = getConfiguredOptions(
+    'assets',
+    'hostingTypes',
+    existingAsset?.hostingType ? [existingAsset.hostingType] : []
+  );
+  const hostingProviderOptions = getConfiguredOptions(
+    'assets',
+    'hostingProviders',
+    existingAsset?.hostingProvider ? [existingAsset.hostingProvider] : []
+  );
+  const locationOptions = getConfiguredOptions(
+    'assets',
+    'locations',
+    existingAsset
+      ? [existingAsset.primaryHostingLocation, ...(existingAsset.additionalHostingLocations || [])]
+      : []
+  );
+  const statusOptions = getConfiguredOptions(
+    'assets',
+    'statuses',
+    existingAsset?.status ? [existingAsset.status] : []
+  );
+  const classificationOptions = getConfiguredOptions(
+    'assets',
+    'classifications',
+    existingAsset?.dataClassification ? [existingAsset.dataClassification] : []
+  );
+  const tomOptions = getConfiguredOptions('assets', 'toms', existingAsset?.toms || []);
+  const tspStatusOptions = getConfiguredOptions(
+    'assets',
+    'tspStatuses',
+    existingAsset?.tspStatus ? [existingAsset.tspStatus] : []
+  );
 
   // Form state fields
   const [name, setName] = useState('');
-  const [managingOrganisation, setManagingOrganisation] = useState<string>(MANAGING_ORGANISATION_OPTIONS[0]);
+  const [managingOrganisation, setManagingOrganisation] = useState<string>(managingOrganisationOptions[0]);
   const [customManagingOrganisation, setCustomManagingOrganisation] = useState('');
   const [description, setDescription] = useState('');
-  const [assetType, setAssetType] = useState<string>(ASSET_TYPE_OPTIONS[0]);
+  const [assetType, setAssetType] = useState<string>(assetTypeOptions[0]);
   const [customAssetType, setCustomAssetType] = useState('');
-  const [hostingType, setHostingType] = useState<string>(HOSTING_TYPE_OPTIONS[0]);
+  const [hostingType, setHostingType] = useState<string>(hostingTypeOptions[0]);
   const [customHostingType, setCustomHostingType] = useState('');
-  const [hostingProvider, setHostingProvider] = useState<string>(HOSTING_PROVIDER_OPTIONS[0]);
+  const [hostingProvider, setHostingProvider] = useState<string>(hostingProviderOptions[0]);
   const [customHostingProvider, setCustomHostingProvider] = useState('');
-  const [primaryHostingLocation, setPrimaryHostingLocation] = useState<string>(COUNTRY_LOCATION_LOOKUP[0]);
+  const [primaryHostingLocation, setPrimaryHostingLocation] = useState<string>(locationOptions[0]);
   const [additionalHostingLocations, setAdditionalHostingLocations] = useState<string[]>([]);
   const [itOwner, setItOwner] = useState('');
-  const [status, setStatus] = useState<StatusType>('Approved');
-  const [dataClassification, setDataClassification] = useState<DataClassification>('Confidential');
+  const [status, setStatus] = useState<StatusType>(
+    (statusOptions.includes('Approved') ? 'Approved' : statusOptions[0]) as StatusType
+  );
+  const [dataClassification, setDataClassification] = useState<DataClassification>(
+    (classificationOptions.includes('Confidential') ? 'Confidential' : classificationOptions[0]) as DataClassification
+  );
 
   // Security Measures State (Reusable TOM Component State)
-  const [tspStatus, setTspStatus] = useState<TSPStatusOption>('Yes');
+  const [tspStatus, setTspStatus] = useState<TSPStatusOption>(
+    (tspStatusOptions.includes('Yes') ? 'Yes' : tspStatusOptions[0]) as TSPStatusOption
+  );
   const [tspJustification, setTspJustification] = useState('');
-  const [toms, setToms] = useState<string[]>(['Encryption at rest', 'Encryption in transit']);
+  const [toms, setToms] = useState<string[]>(
+    ['Encryption at rest', 'Encryption in transit'].filter(item => tomOptions.includes(item))
+  );
   const [tomsOther, setTomsOther] = useState('');
 
   // Relationship state
@@ -80,51 +133,51 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
         setDataClassification(existing.dataClassification || 'Confidential');
 
         // Managing Org lookup vs custom
-        if (existing.managingOrganisation && MANAGING_ORGANISATION_OPTIONS.includes(existing.managingOrganisation as any)) {
+        if (existing.managingOrganisation && managingOrganisationOptions.includes(existing.managingOrganisation)) {
           setManagingOrganisation(existing.managingOrganisation);
           setCustomManagingOrganisation('');
         } else if (existing.managingOrganisation) {
           setManagingOrganisation('Other');
           setCustomManagingOrganisation(existing.managingOrganisation);
         } else {
-          setManagingOrganisation(MANAGING_ORGANISATION_OPTIONS[0]);
+          setManagingOrganisation(managingOrganisationOptions[0]);
         }
 
         // Asset Type lookup vs custom
-        if (existing.assetType && ASSET_TYPE_OPTIONS.includes(existing.assetType as any)) {
+        if (existing.assetType && assetTypeOptions.includes(existing.assetType)) {
           setAssetType(existing.assetType);
           setCustomAssetType('');
         } else if (existing.assetType) {
           setAssetType('Other');
           setCustomAssetType(existing.assetType);
         } else {
-          setAssetType(ASSET_TYPE_OPTIONS[0]);
+          setAssetType(assetTypeOptions[0]);
         }
 
         // Hosting Type lookup vs custom
-        if (existing.hostingType && HOSTING_TYPE_OPTIONS.includes(existing.hostingType as any)) {
+        if (existing.hostingType && hostingTypeOptions.includes(existing.hostingType)) {
           setHostingType(existing.hostingType);
           setCustomHostingType('');
         } else if (existing.hostingType) {
           setHostingType('Other');
           setCustomHostingType(existing.hostingType);
         } else {
-          setHostingType(HOSTING_TYPE_OPTIONS[0]);
+          setHostingType(hostingTypeOptions[0]);
         }
 
         // Hosting Provider lookup vs custom
-        if (existing.hostingProvider && HOSTING_PROVIDER_OPTIONS.includes(existing.hostingProvider as any)) {
+        if (existing.hostingProvider && hostingProviderOptions.includes(existing.hostingProvider)) {
           setHostingProvider(existing.hostingProvider);
           setCustomHostingProvider('');
         } else if (existing.hostingProvider) {
           setHostingProvider('Other');
           setCustomHostingProvider(existing.hostingProvider);
         } else {
-          setHostingProvider(HOSTING_PROVIDER_OPTIONS[0]);
+          setHostingProvider(hostingProviderOptions[0]);
         }
 
         // Locations
-        setPrimaryHostingLocation(existing.primaryHostingLocation || COUNTRY_LOCATION_LOOKUP[0]);
+        setPrimaryHostingLocation(existing.primaryHostingLocation || locationOptions[0]);
         setAdditionalHostingLocations(existing.additionalHostingLocations || []);
 
         // TOMs & Security
@@ -149,22 +202,29 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
       // Reset form defaults for new record
       setName('');
       setDescription('');
-      setManagingOrganisation(MANAGING_ORGANISATION_OPTIONS[0]);
+      setManagingOrganisation(managingOrganisationOptions[0]);
       setCustomManagingOrganisation('');
-      setAssetType(ASSET_TYPE_OPTIONS[0]);
+      setAssetType(assetTypeOptions[0]);
       setCustomAssetType('');
-      setHostingType(HOSTING_TYPE_OPTIONS[0]);
+      setHostingType(hostingTypeOptions[0]);
       setCustomHostingType('');
-      setHostingProvider(HOSTING_PROVIDER_OPTIONS[0]);
+      setHostingProvider(hostingProviderOptions[0]);
       setCustomHostingProvider('');
-      setPrimaryHostingLocation(COUNTRY_LOCATION_LOOKUP[0]);
+      setPrimaryHostingLocation(locationOptions[0]);
       setAdditionalHostingLocations([]);
       setItOwner('');
-      setStatus('Approved');
-      setDataClassification('Confidential');
-      setTspStatus('Yes');
+      setStatus((statusOptions.includes('Approved') ? 'Approved' : statusOptions[0]) as StatusType);
+      setDataClassification(
+        (classificationOptions.includes('Confidential') ? 'Confidential' : classificationOptions[0]) as DataClassification
+      );
+      setTspStatus(
+        (tspStatusOptions.includes('Yes') ? 'Yes' : tspStatusOptions[0]) as TSPStatusOption
+      );
       setTspJustification('');
-      setToms(['Encryption at rest', 'Encryption in transit', 'Role Based Access Controls']);
+      setToms(
+        ['Encryption at rest', 'Encryption in transit', 'Role Based Access Controls']
+          .filter(item => tomOptions.includes(item))
+      );
       setTomsOther('');
       setProcessingActivityIds([]);
       setVendorIds([]);
@@ -176,7 +236,7 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
   if (!isOpen) return null;
 
   // Filter available options for additional hosting locations to exclude primary location
-  const availableAdditionalLocations = COUNTRY_LOCATION_LOOKUP.filter(
+  const availableAdditionalLocations = locationOptions.filter(
     loc => loc !== primaryHostingLocation
   );
 
@@ -385,12 +445,11 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
                     onChange={e => setManagingOrganisation(e.target.value)}
                     className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   >
-                    {MANAGING_ORGANISATION_OPTIONS.map(org => (
+                    {managingOrganisationOptions.map(org => (
                       <option key={org} value={org}>
-                        {org}
+                        {org === 'Other' ? 'Other (Custom Organisation)' : org}
                       </option>
                     ))}
-                    <option value="Other">Other (Custom Organisation)</option>
                   </select>
                 </div>
 
@@ -422,12 +481,11 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
                     onChange={e => setAssetType(e.target.value)}
                     className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   >
-                    {ASSET_TYPE_OPTIONS.map(t => (
+                    {assetTypeOptions.map(t => (
                       <option key={t} value={t}>
-                        {t}
+                        {t === 'Other' ? 'Other (Custom Asset Type)' : t}
                       </option>
                     ))}
-                    <option value="Other">Other (Custom Asset Type)</option>
                   </select>
                 </div>
 
@@ -474,10 +532,9 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
                     onChange={e => setStatus(e.target.value as StatusType)}
                     className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   >
-                    <option value="Approved">Approved</option>
-                    <option value="Under Review">Under Review</option>
-                    <option value="Draft">Draft</option>
-                    <option value="Archived">Archived</option>
+                    {Array.from(new Set([...statusOptions, status])).map(option => (
+                      <option key={option} value={option}>{option}</option>
+                    ))}
                   </select>
                 </div>
 
@@ -490,10 +547,9 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
                     onChange={e => setDataClassification(e.target.value as DataClassification)}
                     className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   >
-                    <option value="Restricted">Restricted (Highest Sensitivity)</option>
-                    <option value="Confidential">Confidential</option>
-                    <option value="Internal">Internal Use Only</option>
-                    <option value="Public">Public</option>
+                    {Array.from(new Set([...classificationOptions, dataClassification])).map(option => (
+                      <option key={option} value={option}>{option}</option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -533,12 +589,11 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
                     onChange={e => setHostingType(e.target.value)}
                     className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   >
-                    {HOSTING_TYPE_OPTIONS.map(ht => (
+                    {hostingTypeOptions.map(ht => (
                       <option key={ht} value={ht}>
-                        {ht}
+                        {ht === 'Other' ? 'Other (Custom Hosting Type)' : ht}
                       </option>
                     ))}
-                    <option value="Other">Other (Custom Hosting Type)</option>
                   </select>
                 </div>
 
@@ -570,12 +625,11 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
                     onChange={e => setHostingProvider(e.target.value)}
                     className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   >
-                    {HOSTING_PROVIDER_OPTIONS.map(hp => (
+                    {hostingProviderOptions.map(hp => (
                       <option key={hp} value={hp}>
-                        {hp}
+                        {hp === 'Other' ? 'Other (Custom Hosting Provider)' : hp}
                       </option>
                     ))}
-                    <option value="Other">Other (Custom Hosting Provider)</option>
                   </select>
                 </div>
 
@@ -608,7 +662,7 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
                   onChange={e => handlePrimaryLocationChange(e.target.value)}
                   className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 >
-                  {COUNTRY_LOCATION_LOOKUP.map(loc => (
+                  {locationOptions.map(loc => (
                     <option key={loc} value={loc}>
                       {loc}
                     </option>
@@ -698,6 +752,8 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
                 onTomsChange={setToms}
                 tomsOther={tomsOther}
                 onTomsOtherChange={setTomsOther}
+                tomOptions={tomOptions}
+                tspStatusOptions={tspStatusOptions}
                 errors={{
                   tspJustification: errors.tspJustification,
                   tomsOther: errors.tomsOther,

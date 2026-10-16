@@ -105,31 +105,41 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
     entities,
     addRecord,
     updateRecord,
+    getConfiguredOptions,
   } = usePrivacyData();
 
   const isEdit = Boolean(recordIdToEdit);
+  const enabledStatuses = getConfiguredOptions('processingActivities', 'statuses');
+  const enabledRoles = getConfiguredOptions('processingActivities', 'roles');
+  const enabledLegalBases = getConfiguredOptions('processingActivities', 'legalBases');
+  const enabledDataSubjectCategories = getConfiguredOptions('processingActivities', 'dataSubjectCategories');
+  const enabledPersonalDataItems = getConfiguredOptions('processingActivities', 'personalDataItems');
+  const enabledInternalRecipients = getConfiguredOptions('processingActivities', 'internalRecipients');
+  const enabledExternalRecipients = getConfiguredOptions('processingActivities', 'externalRecipients');
+  const enabledToms = getConfiguredOptions('processingActivities', 'toms');
+  const enabledTspStatuses = getConfiguredOptions('processingActivities', 'tspStatuses');
   const [currentStep, setCurrentStep] = useState<number>(1);
 
   // Form State
   const [formData, setFormData] = useState<Partial<ProcessingActivity>>({
     name: '',
     description: '',
-    status: 'Draft' as StatusType,
+    status: (enabledStatuses.includes('Draft') ? 'Draft' : enabledStatuses[0]) as StatusType,
     owner: '',
-    role: 'Controller' as ProcessingRole,
+    role: (enabledRoles.includes('Controller') ? 'Controller' : enabledRoles[0]) as ProcessingRole,
     dataProtectionContact: '',
     controllerContactDetails: '',
     purpose: '',
     processorAndControllerDetails: '',
     categoriesOfProcessing: [],
-    legalBasis: 'Legitimate Interest' as LegalBasis,
+    legalBasis: (enabledLegalBases[0] || '') as LegalBasis,
     retentionPeriod: '3 Years',
     hasRetentionPolicy: true,
-    personalDataCategories: ['Contact Info'],
+    personalDataCategories: enabledPersonalDataItems.slice(0, 1),
     involvesHighRiskData: false,
     transferSafeguards: 'EU Standard Contractual Clauses (SCCs)',
-    toms: ['AES-256 Encryption at Rest', 'TLS 1.3 in Transit'],
-    dataSubjectCategories: ['Customers'],
+    toms: enabledToms.slice(0, 2),
+    dataSubjectCategories: enabledDataSubjectCategories.slice(0, 1),
     tspIds: [],
     assetIds: [],
     dataSourceAssetIds: [],
@@ -138,6 +148,48 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
     entityIds: [],
     tags: [],
   });
+
+  const statusOptions = getConfiguredOptions('processingActivities', 'statuses', isEdit ? [formData.status || ''] : []);
+  const roleOptions = getConfiguredOptions('processingActivities', 'roles', isEdit ? [formData.role || ''] : []);
+  const controllerPurposeOptions = getConfiguredOptions('processingActivities', 'controllerPurposes', isEdit ? [formData.purpose || ''] : []);
+  const processorCategoryOptions = getConfiguredOptions(
+    'processingActivities',
+    'processorCategories',
+    isEdit ? (formData.categoriesOfProcessing as string[] || []) : []
+  );
+  const legalBasisOptions = getConfiguredOptions('processingActivities', 'legalBases', isEdit ? [formData.legalBasis || ''] : []);
+  const dataSubjectCategoryOptions = getConfiguredOptions(
+    'processingActivities',
+    'dataSubjectCategories',
+    isEdit ? formData.dataSubjectCategories || [] : []
+  );
+  const configuredPersonalDataItems = getConfiguredOptions(
+    'processingActivities',
+    'personalDataItems',
+    isEdit ? formData.personalDataCategories || [] : []
+  );
+  const internalRecipientOptions = getConfiguredOptions(
+    'processingActivities',
+    'internalRecipients',
+    isEdit ? (formData.recipientCategories || []).filter(value => RECIPIENT_CATEGORIES_INTERNAL.includes(value as any)) : []
+  );
+  const externalRecipientOptions = getConfiguredOptions(
+    'processingActivities',
+    'externalRecipients',
+    isEdit ? (formData.recipientCategories || []).filter(value => RECIPIENT_CATEGORIES_EXTERNAL.includes(value as any)) : []
+  );
+  const transferRegionOptions = getConfiguredOptions(
+    'processingActivities',
+    'transferRegions',
+    isEdit ? formData.selectedTransferRegions || [] : []
+  );
+  const transferSafeguardOptions = getConfiguredOptions(
+    'processingActivities',
+    'transferSafeguards',
+    isEdit ? (formData.internationalTransferDetails || []).map(detail => detail.safeguard).filter(Boolean) : []
+  );
+  const configuredToms = getConfiguredOptions('processingActivities', 'toms', isEdit ? formData.toms || [] : []);
+  const configuredTspStatuses = getConfiguredOptions('processingActivities', 'tspStatuses', isEdit ? [formData.tspStatus || ''] : []);
 
   // Role switch warning modal state
   const [pendingRoleSwitch, setPendingRoleSwitch] = useState<ProcessingRole | null>(null);
@@ -225,14 +277,16 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
         });
       }
     } else {
-      const defaultCategories = ['Customers or Prospects'];
-      const defaultMap: Record<string, string[]> = {
-        'Customers or Prospects': [
-          'Name (First, Last, or both)',
-          'Email address',
-          'Device information (such as IP Address, MAC address)',
-        ],
-      };
+      const defaultCategory = enabledDataSubjectCategories[0];
+      const defaultCategories = defaultCategory ? [defaultCategory] : [];
+      const preferredItems = [
+        'Name (First, Last, or both)',
+        'Email address',
+        'Device information (such as IP Address, MAC address)',
+      ].filter(item => enabledPersonalDataItems.includes(item));
+      const defaultMap: Record<string, string[]> = defaultCategory
+        ? { [defaultCategory]: preferredItems.length ? preferredItems : enabledPersonalDataItems.slice(0, 3) }
+        : {};
       const allPersonalData = Array.from(new Set((Object.values(defaultMap) as string[][]).flat()));
       const hasHighRisk = allPersonalData.some(item => getPersonalDataMetadata(item).isHighRisk);
 
@@ -240,27 +294,31 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
       setFormData({
         name: '',
         description: '',
-        status: 'Draft',
+        status: (enabledStatuses.includes('Draft') ? 'Draft' : enabledStatuses[0]) as StatusType,
         owner: '',
-        role: 'Controller',
+        role: (enabledRoles.includes('Controller') ? 'Controller' : enabledRoles[0]) as ProcessingRole,
         dataProtectionContact: '',
         controllerContactDetails: '',
         purpose: '',
         processorAndControllerDetails: '',
         categoriesOfProcessing: [],
-        legalBasis: 'Legitimate Interest',
+        legalBasis: (enabledLegalBases[0] || '') as LegalBasis,
         retentionPeriod: '3 Years',
         hasRetentionPolicy: true,
         personalDataCategories: allPersonalData,
         involvesHighRiskData: hasHighRisk,
         transferSafeguards: 'EU Standard Contractual Clauses (SCCs)',
-        toms: ['Activity logging', 'Encryption at rest', 'Encryption in transit', 'Role Based Access Controls'],
+        toms: ['Activity logging', 'Encryption at rest', 'Encryption in transit', 'Role Based Access Controls']
+          .filter(item => enabledToms.includes(item)),
         tomsOther: '',
-        tspStatus: 'Yes',
+        tspStatus: (enabledTspStatuses.includes('Yes') ? 'Yes' : enabledTspStatuses[0]) as any,
         tspJustification: '',
         dataSubjectCategories: defaultCategories,
         dataSubjectPersonalDataMap: defaultMap,
-        recipientCategories: ['Trimble Cloud Platform', 'Third Party Vendors'],
+        recipientCategories: [
+          enabledInternalRecipients.includes('Trimble Cloud Platform') ? 'Trimble Cloud Platform' : enabledInternalRecipients[0],
+          enabledExternalRecipients.includes('Third Party Vendors') ? 'Third Party Vendors' : enabledExternalRecipients[0],
+        ].filter(Boolean) as string[],
         specifiedTrimbleProductTeam: '',
         specifiedThirdParty: '',
         hasInternationalTransfer: 'No',
@@ -851,10 +909,9 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                   onChange={e => setFormData({ ...formData, status: e.target.value as StatusType })}
                   className="bg-slate-800 border border-slate-700 text-slate-200 text-xs font-semibold rounded px-2 py-0.5 focus:outline-none focus:border-indigo-500"
                 >
-                  <option value="Draft">Draft</option>
-                  <option value="Under Review">Under Review</option>
-                  <option value="Approved">Approved</option>
-                  <option value="Archived">Archived</option>
+                  {statusOptions.map(option => (
+                    <option key={option} value={option}>{option}</option>
+                  ))}
                 </select>
               </div>
 
@@ -1017,29 +1074,21 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                 </label>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  {[
-                    {
-                      roleVal: 'Controller' as ProcessingRole,
-                      title: 'Controller',
-                      subtitle: 'Determines the purposes and means of processing personal data.',
-                    },
-                    {
-                      roleVal: 'Processor (B2B sales only)' as ProcessingRole,
-                      title: 'Processor (B2B Sales Only)',
-                      subtitle: 'Processes data on behalf of business customers under contract.',
-                    },
-                    {
-                      roleVal: 'Processor (but including B2C sales)' as ProcessingRole,
-                      title: 'Processor (including B2C)',
-                      subtitle: 'Processes consumer or mixed business data on behalf of clients.',
-                    },
-                  ].map(opt => {
-                    const isSelected = formData.role === opt.roleVal;
+                  {roleOptions.map(roleValue => {
+                    const roleVal = roleValue as ProcessingRole;
+                    const isSelected = formData.role === roleVal;
+                    const subtitle = roleValue === 'Controller'
+                      ? 'Determines the purposes and means of processing personal data.'
+                      : roleValue === 'Processor (B2B sales only)'
+                      ? 'Processes data on behalf of business customers under contract.'
+                      : roleValue === 'Processor (but including B2C sales)'
+                      ? 'Processes consumer or mixed business data on behalf of clients.'
+                      : 'Configured processing role.';
                     return (
                       <button
-                        key={opt.roleVal}
+                        key={roleValue}
                         type="button"
-                        onClick={() => handleRoleChangeAttempt(opt.roleVal)}
+                        onClick={() => handleRoleChangeAttempt(roleVal)}
                         className={`p-4 rounded-lg border text-left transition flex flex-col justify-between ${
                           isSelected
                             ? 'bg-indigo-50/70 border-indigo-600 ring-2 ring-indigo-600/20'
@@ -1048,7 +1097,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                       >
                         <div>
                           <div className="flex items-center justify-between mb-1">
-                            <span className="font-bold text-xs text-slate-900">{opt.title}</span>
+                            <span className="font-bold text-xs text-slate-900">{roleValue}</span>
                             <div
                               className={`w-4 h-4 rounded-full border flex items-center justify-center ${
                                 isSelected ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-slate-300'
@@ -1057,7 +1106,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                               {isSelected && <Check className="w-2.5 h-2.5" />}
                             </div>
                           </div>
-                          <p className="text-[11px] text-slate-500 leading-relaxed">{opt.subtitle}</p>
+                          <p className="text-[11px] text-slate-500 leading-relaxed">{subtitle}</p>
                         </div>
                       </button>
                     );
@@ -1081,7 +1130,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                   <div>
                     <Select
                       label="Purposes of Processing *"
-                      options={CONTROLLER_PURPOSES as any}
+                      options={controllerPurposeOptions}
                       value={formData.purpose || ''}
                       onChange={e => setFormData({ ...formData, purpose: e.target.value })}
                       placeholder="-- Select Primary Purpose of Processing --"
@@ -1130,7 +1179,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                       label="Categories of Processing *"
                       selectedValues={(formData.categoriesOfProcessing as string[]) || []}
                       onChange={vals => setFormData({ ...formData, categoriesOfProcessing: vals })}
-                      presetOptions={PROCESSOR_CATEGORIES as any}
+                      presetOptions={processorCategoryOptions}
                     />
                     <p className="text-[11px] text-slate-500 mt-1">
                       Select all categories of processing operations performed on behalf of your controllers.
@@ -1185,7 +1234,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {DATA_SUBJECT_CATEGORIES.map(cat => {
+                  {dataSubjectCategoryOptions.map(cat => {
                     const isSelected = (formData.dataSubjectCategories || []).includes(cat);
                     const itemCount = (formData.dataSubjectPersonalDataMap?.[cat] || []).length;
                     return (
@@ -1288,6 +1337,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                       key={cat}
                       subjectCategory={cat}
                       assignedDataItems={formData.dataSubjectPersonalDataMap?.[cat] || []}
+                      availableDataItems={configuredPersonalDataItems}
                       onChangeDataItems={newItems => handleUpdateItemsForSubjectCategory(cat, newItems)}
                       onRemoveSubjectCategory={() => handleToggleDataSubjectCategory(cat)}
                     />
@@ -1318,7 +1368,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                   </h4>
                   <span className="text-[11px] font-semibold text-slate-500">
                     {
-                      RECIPIENT_CATEGORIES_INTERNAL.filter(c =>
+                      internalRecipientOptions.filter(c =>
                         formData.recipientCategories?.includes(c)
                       ).length
                     } selected
@@ -1326,7 +1376,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-                  {RECIPIENT_CATEGORIES_INTERNAL.map(cat => {
+                  {internalRecipientOptions.map(cat => {
                     const isChecked = formData.recipientCategories?.includes(cat);
                     return (
                       <label
@@ -1374,7 +1424,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                   </h4>
                   <span className="text-[11px] font-semibold text-slate-500">
                     {
-                      RECIPIENT_CATEGORIES_EXTERNAL.filter(c =>
+                      externalRecipientOptions.filter(c =>
                         formData.recipientCategories?.includes(c)
                       ).length
                     } selected
@@ -1382,7 +1432,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                  {RECIPIENT_CATEGORIES_EXTERNAL.map(cat => {
+                  {externalRecipientOptions.map(cat => {
                     const isChecked = formData.recipientCategories?.includes(cat);
                     return (
                       <label
@@ -1522,7 +1572,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                     </div>
 
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                      {TRANSFER_REGIONS.map(region => {
+                      {transferRegionOptions.map(region => {
                         const isChecked = formData.selectedTransferRegions?.includes(region);
                         return (
                           <label
@@ -1635,7 +1685,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                                 onChange={e => handleUpdateCountrySafeguard(item.id, e.target.value as any, item.specifiedSafeguard)}
                                 className="px-2.5 py-1.5 bg-white border border-slate-300 rounded-md text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                               >
-                                {TRANSFER_SAFEGUARD_OPTIONS.map(opt => (
+                                {transferSafeguardOptions.map(opt => (
                                   <option key={opt} value={opt}>
                                     {opt}
                                   </option>
@@ -1844,7 +1894,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                   <div className="space-y-4">
                     <Select
                       label="Art. 6 Legal Basis for Controller Processing"
-                      options={CONTROLLER_LEGAL_BASIS_OPTIONS}
+                      options={legalBasisOptions}
                       value={formData.legalBasis || ''}
                       onChange={e =>
                         setFormData(prev => ({
@@ -1926,6 +1976,8 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                 tspJustification={formData.tspJustification || ''}
                 toms={formData.toms || []}
                 tomsOther={formData.tomsOther || ''}
+                tomOptions={configuredToms}
+                tspStatusOptions={configuredTspStatuses}
                 onTspStatusChange={status => setFormData(prev => ({ ...prev, tspStatus: status }))}
                 onTspJustificationChange={justification => setFormData(prev => ({ ...prev, tspJustification: justification }))}
                 onTomsChange={toms => setFormData(prev => ({ ...prev, toms }))}

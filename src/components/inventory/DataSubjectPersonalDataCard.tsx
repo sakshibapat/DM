@@ -23,6 +23,7 @@ import {
 interface DataSubjectPersonalDataCardProps {
   subjectCategory: string;
   assignedDataItems: string[];
+  availableDataItems?: readonly string[];
   onChangeDataItems: (newItems: string[]) => void;
   onRemoveSubjectCategory: () => void;
 }
@@ -30,6 +31,7 @@ interface DataSubjectPersonalDataCardProps {
 export const DataSubjectPersonalDataCard: React.FC<DataSubjectPersonalDataCardProps> = ({
   subjectCategory,
   assignedDataItems,
+  availableDataItems = CONTROLLED_PERSONAL_DATA_ITEMS,
   onChangeDataItems,
   onRemoveSubjectCategory,
 }) => {
@@ -54,7 +56,7 @@ export const DataSubjectPersonalDataCard: React.FC<DataSubjectPersonalDataCardPr
 
   // Filter available items
   const filteredItems = useMemo(() => {
-    return CONTROLLED_PERSONAL_DATA_ITEMS.filter(itemName => {
+    return Array.from(new Set([...availableDataItems, ...assignedDataItems])).filter(itemName => {
       const meta = getPersonalDataMetadata(itemName);
       // Search query filter
       const matchesSearch =
@@ -69,7 +71,7 @@ export const DataSubjectPersonalDataCard: React.FC<DataSubjectPersonalDataCardPr
       if (classificationFilter === 'High Risk') return meta.isHighRisk;
       return meta.classification === classificationFilter;
     });
-  }, [searchQuery, classificationFilter]);
+  }, [availableDataItems, assignedDataItems, searchQuery, classificationFilter]);
 
   const toggleItem = (itemName: string) => {
     if (assignedDataItems.includes(itemName)) {
