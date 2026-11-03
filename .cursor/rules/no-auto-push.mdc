@@ -1,0 +1,26 @@
+---
+description: Never push after a commit; prompt the user to push manually
+alwaysApply: true
+---
+
+# Commits stay local
+
+A request to commit is not a request to push. After a commit succeeds, leave it local.
+
+When the commit finishes, tell the user:
+
+- the branch name
+- that the commit has not been pushed
+- that they can push it manually when they are ready
+
+Ask whether they want to push, and wait for an explicit later instruction before running `git push` or any other command that publishes commits.
+
+## Example
+
+User: "Commit these changes."
+
+1. Create the commit.
+2. Reply: "Committed on `feature/foo`. This is local only. Push `feature/foo` to `origin` when you are ready?"
+3. Stop. Do not push in that turn.
+
+Push only after the user clearly says to push, for example "push it" or "push to origin".
