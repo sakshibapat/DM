@@ -10,6 +10,7 @@ import { DataFlowsView } from './components/flows/DataFlowsView';
 import { FutureModulePlaceholder } from './components/future/FutureModulePlaceholder';
 import { InventoryManagerView } from './components/settings/InventoryManagerView';
 import { AssessmentsView } from './components/assessments/AssessmentsView';
+import { RopaView } from './components/ropa/RopaView';
 import { InventoryType } from './types/privacy';
 
 const MainAppContent: React.FC = () => {
@@ -77,6 +78,10 @@ const MainAppContent: React.FC = () => {
 
     if (activeNav === 'privacyAssessments' || activeNav === 'future-assessments') {
       return <AssessmentsView />;
+    }
+
+    if (activeNav === 'ropa') {
+      return <RopaView />;
     }
 
     if (activeNav.startsWith('future-')) {

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { FileCheck, Plus, Search, Trash2 } from 'lucide-react';
 import { usePrivacyData } from '../../context/PrivacyDataContext';
 import { ASSESSMENT_STATUSES, AssessmentStatus } from '../../types/assessment';
@@ -15,11 +15,19 @@ const formatDate = (iso: string) => {
 };
 
 export const AssessmentsView: React.FC = () => {
-  const { privacyAssessments, processingActivities, deleteAssessment } = usePrivacyData();
+  const { privacyAssessments, processingActivities, deleteAssessment, assessmentToOpen, setAssessmentToOpen } = usePrivacyData();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<AssessmentStatus | 'all'>('all');
   const [editingId, setEditingId] = useState<string | 'new' | null>(null);
   const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
+
+  useEffect(() => {
+    if (!assessmentToOpen) return;
+    if (privacyAssessments.some(item => item.id === assessmentToOpen)) {
+      setEditingId(assessmentToOpen);
+    }
+    setAssessmentToOpen(null);
+  }, [assessmentToOpen, privacyAssessments, setAssessmentToOpen]);
 
   const filtered = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();

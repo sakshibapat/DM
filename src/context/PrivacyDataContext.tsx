@@ -46,6 +46,8 @@ interface PrivacyDataContextType {
   // Navigation State
   activeNav: string; // 'dashboard' | 'processingActivities' | 'tspReferences' | 'assets' | 'vendors' | 'entities' | 'future-assessments' | ...
   setActiveNav: (nav: string) => void;
+  assessmentToOpen: string | null;
+  setAssessmentToOpen: (id: string | null) => void;
   
   // Selected record drawer state
   selectedRecord: { id: string; type: InventoryType } | null;
@@ -98,6 +100,7 @@ const PrivacyDataContext = createContext<PrivacyDataContextType | undefined>(und
 
 export const PrivacyDataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [activeNav, setActiveNav] = useState<string>('dashboard');
+  const [assessmentToOpen, setAssessmentToOpen] = useState<string | null>(null);
   const [selectedRecord, setSelectedRecord] = useState<{ id: string; type: InventoryType } | null>(null);
   const [globalSearchQuery, setGlobalSearchQuery] = useState<string>('');
 
@@ -969,6 +972,8 @@ export const PrivacyDataProvider: React.FC<{ children: React.ReactNode }> = ({ c
         privacyAssessments,
         activeNav,
         setActiveNav,
+        assessmentToOpen,
+        setAssessmentToOpen,
         selectedRecord,
         setSelectedRecord,
         globalSearchQuery,
