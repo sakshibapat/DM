@@ -57,12 +57,6 @@ export const Sidebar: React.FC = () => {
       icon: Globe2,
       accent: 'text-purple-600',
     },
-    {
-      id: 'dataFlows',
-      label: 'Data Flows',
-      icon: Layers,
-      accent: 'text-indigo-500',
-    },
   ];
 
   const futureModules = [

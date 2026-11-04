@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   X,
   Edit,
@@ -48,6 +48,15 @@ export const RecordDetailDrawer: React.FC<RecordDetailDrawerProps> = ({ onEditRe
   } = usePrivacyData();
 
   const [activeTab, setActiveTab] = useState<'overview' | 'relationships' | 'governance' | 'dataFlow'>('overview');
+
+  useEffect(() => {
+    if (!selectedRecord) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setSelectedRecord(null);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [selectedRecord, setSelectedRecord]);
 
   if (!selectedRecord) return null;
 
@@ -146,8 +155,18 @@ export const RecordDetailDrawer: React.FC<RecordDetailDrawerProps> = ({ onEditRe
   const attentionGaps = getRecordAttentionGaps();
 
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden bg-slate-900/40 backdrop-blur-2xs flex justify-end animate-in fade-in duration-200">
-      <div className="w-full max-w-2xl bg-white h-full shadow-2xl flex flex-col border-l border-slate-200 animate-in slide-in-from-right duration-250">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-2xs sm:p-8 animate-in fade-in duration-200"
+      onClick={() => setSelectedRecord(null)}
+      role="presentation"
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="record-preview-title"
+        onClick={event => event.stopPropagation()}
+        className="flex max-h-[min(90vh,880px)] w-full max-w-4xl flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl animate-in zoom-in-95 fade-in duration-200"
+      >
         {/* Drawer Header */}
         <div className="p-6 border-b border-slate-200 bg-slate-50/60 flex items-start justify-between gap-4">
           <div className="space-y-1 min-w-0">
@@ -161,7 +180,7 @@ export const RecordDetailDrawer: React.FC<RecordDetailDrawerProps> = ({ onEditRe
               <StatusBadge status={record.status} />
               <span className="text-xs text-slate-500 font-medium">({getInventoryTitle(type)})</span>
             </div>
-            <h2 className="text-lg font-bold text-slate-900 leading-snug">{record.name}</h2>
+            <h2 id="record-preview-title" className="text-lg font-bold text-slate-900 leading-snug">{record.name}</h2>
           </div>
 
           <div className="flex items-center gap-1 shrink-0">

@@ -1868,7 +1868,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                           No defined data retention policy.
                         </span>
                         <p className="text-[11px] text-rose-800 mt-0.5">
-                          This processing activity record can be saved as a draft, but operating without a retention policy violates data minimization rules (GDPR Art. 5(1)(e)). This warning will be highlighted in Records Requiring Attention.
+                          This processing activity record can be saved as a draft, but operating without a retention policy violates data minimization rules (GDPR Art. 5(1)(e)).
                         </p>
                       </div>
                     </div>
