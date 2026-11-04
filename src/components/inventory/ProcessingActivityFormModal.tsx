@@ -29,9 +29,21 @@ import {
   Trash2,
   Tag,
   UserCheck,
+  Plus,
 } from 'lucide-react';
 import { usePrivacyData } from '../../context/PrivacyDataContext';
 import { SecurityMeasuresSection } from '../common/SecurityMeasuresSection';
+import { ActivityTransferChart } from './ActivityTransferChart';
+import { DestinationSafeguardControl, SafeguardView } from './DestinationSafeguardControl';
+import {
+  createTransferLink,
+  isPresetSafeguard,
+  primaryTransferSafeguard,
+  resolveTransferLinks,
+  safeguardsFromLinks,
+  transferLinkId,
+} from '../../utils/destinationSafeguards';
+import { AssetTransferLink } from '../../types/privacy';
 import {
   ProcessingActivity,
   ProcessingRole,
@@ -76,13 +88,28 @@ interface ProcessingActivityFormModalProps {
   recordIdToEdit?: string | null;
 }
 
+const selectedRetentionType = (
+  data: { retentionPolicyType?: string; hasRetentionPolicy?: boolean },
+): 'Custom' | 'None' | undefined => {
+  if (data.retentionPolicyType === 'Custom' || data.retentionPolicyType === 'None') return data.retentionPolicyType;
+  if (data.hasRetentionPolicy === true) return 'Custom';
+  if (data.hasRetentionPolicy === false) return 'None';
+  return undefined;
+};
+
+const viewForSafeguard = (value: string): SafeguardView => {
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.toLowerCase() === 'none' || isPresetSafeguard(trimmed)) return 'choices';
+  return 'saved-text';
+};
+
 export const FORM_STEPS = [
   { id: 1, name: 'Overview', icon: FileText, desc: 'Basic record metadata & ownership' },
   { id: 2, name: 'Role', icon: Shield, desc: 'Controller or Processor classification' },
-  { id: 3, name: 'Data Subjects & Data', icon: User, desc: 'Personal data categories & high risk' },
-  { id: 4, name: 'Recipients', icon: Building, desc: 'Internal & external disclosures' },
+  { id: 3, name: 'Personal Data', icon: User, desc: 'Personal data categories & high risk' },
+  { id: 4, name: 'Categories of Recipients', icon: Building, desc: 'Internal & external disclosures' },
   { id: 5, name: 'Data Flows', icon: Globe, desc: 'Cross-border safeguards' },
-  { id: 6, name: 'Retention & Legal Basis', icon: Clock, desc: 'Art 6 legal basis & schedule' },
+  { id: 6, name: 'Data Retention', icon: Clock, desc: 'Retention schedule' },
   { id: 7, name: 'Security Measures', icon: Lock, desc: 'TOMs & encryption controls' },
   { id: 8, name: 'Related Inventories', icon: Layers, desc: 'Assets, Vendors, & Entities' },
 ];
@@ -104,39 +131,32 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
   } = usePrivacyData();
 
   const isEdit = Boolean(recordIdToEdit);
-  const enabledStatuses = getConfiguredOptions('processingActivities', 'statuses');
-  const enabledRoles = getConfiguredOptions('processingActivities', 'roles');
-  const enabledLegalBases = getConfiguredOptions('processingActivities', 'legalBases');
-  const enabledDataSubjectCategories = getConfiguredOptions('processingActivities', 'dataSubjectCategories');
-  const enabledPersonalDataItems = getConfiguredOptions('processingActivities', 'personalDataItems');
-  const enabledInternalRecipients = getConfiguredOptions('processingActivities', 'internalRecipients');
-  const enabledExternalRecipients = getConfiguredOptions('processingActivities', 'externalRecipients');
-  const enabledToms = getConfiguredOptions('processingActivities', 'toms');
-  const enabledTspStatuses = getConfiguredOptions('processingActivities', 'tspStatuses');
   const [currentStep, setCurrentStep] = useState<number>(1);
-  const [safeguardView, setSafeguardView] = useState<'choices' | 'other-draft' | 'saved-text'>('choices');
-  const [otherSafeguardDraft, setOtherSafeguardDraft] = useState('');
+  const [safeguardViews, setSafeguardViews] = useState<Record<string, SafeguardView>>({});
+  const [otherSafeguardDrafts, setOtherSafeguardDrafts] = useState<Record<string, string>>({});
+  const [blankDestinationKeys, setBlankDestinationKeys] = useState<string[]>([]);
 
   // Form State
   const [formData, setFormData] = useState<Partial<ProcessingActivity>>({
     name: '',
     description: '',
-    status: (enabledStatuses.includes('Draft') ? 'Draft' : enabledStatuses[0]) as StatusType,
+    status: '' as StatusType,
     owner: '',
-    role: (enabledRoles.includes('Controller') ? 'Controller' : enabledRoles[0]) as ProcessingRole,
+    role: '' as ProcessingRole,
     dataProtectionContact: '',
     controllerContactDetails: '',
     purpose: '',
     processorAndControllerDetails: '',
     categoriesOfProcessing: [],
-    legalBasis: (enabledLegalBases[0] || '') as LegalBasis,
-    retentionPeriod: '3 Years',
-    hasRetentionPolicy: true,
-    personalDataCategories: enabledPersonalDataItems.slice(0, 1),
+    legalBasis: '' as LegalBasis,
+    retentionPeriod: '',
+    personalDataCategories: [],
     involvesHighRiskData: false,
-    transferSafeguards: 'EU Standard Contractual Clauses (SCCs)',
-    toms: enabledToms.slice(0, 2),
-    dataSubjectCategories: enabledDataSubjectCategories.slice(0, 1),
+    transferSafeguards: '',
+    transferSafeguardsByDestination: {},
+    assetTransferLinks: [],
+    toms: [],
+    dataSubjectCategories: [],
     tspIds: [],
     assetIds: [],
     dataSourceAssetIds: [],
@@ -186,9 +206,11 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
     category: string;
     itemCount: number;
   } | null>(null);
+  const [revealedDataSubject, setRevealedDataSubject] = useState<string | null>(null);
 
   // Populate form if editing
   useEffect(() => {
+    setRevealedDataSubject(null);
     if (isEdit && recordIdToEdit) {
       const existing = processingActivities.find(x => x.id === recordIdToEdit);
       if (existing) {
@@ -261,54 +283,41 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
           internationalTransferDetails: transferDetails,
           dataSourceAssetIds: existing.dataSourceAssetIds || [],
           dataDestinationAssetIds: existing.dataDestinationAssetIds || [],
+          assetTransferLinks: resolveTransferLinks(existing),
+          transferSafeguardsByDestination: safeguardsFromLinks(resolveTransferLinks(existing)),
+          transferSafeguards: (existing.dataDestinationAssetIds || []).length
+            ? primaryTransferSafeguard(existing.dataDestinationAssetIds || [], safeguardsFromLinks(resolveTransferLinks(existing)))
+            : existing.transferSafeguards || '',
         });
       }
     } else {
-      const defaultCategory = enabledDataSubjectCategories[0];
-      const defaultCategories = defaultCategory ? [defaultCategory] : [];
-      const preferredItems = [
-        'Name (First, Last, or both)',
-        'Email address',
-        'Device information (such as IP Address, MAC address)',
-      ].filter(item => enabledPersonalDataItems.includes(item));
-      const defaultMap: Record<string, string[]> = defaultCategory
-        ? { [defaultCategory]: preferredItems.length ? preferredItems : enabledPersonalDataItems.slice(0, 3) }
-        : {};
-      const allPersonalData = Array.from(new Set((Object.values(defaultMap) as string[][]).flat()));
-      const hasHighRisk = allPersonalData.some(item => getPersonalDataMetadata(item).isHighRisk);
-
-      // Reset defaults for new record
       setFormData({
         name: '',
         description: '',
-        status: (enabledStatuses.includes('Draft') ? 'Draft' : enabledStatuses[0]) as StatusType,
+        status: '' as StatusType,
         owner: '',
-        role: (enabledRoles.includes('Controller') ? 'Controller' : enabledRoles[0]) as ProcessingRole,
+        role: '' as ProcessingRole,
         dataProtectionContact: '',
         controllerContactDetails: '',
         purpose: '',
         processorAndControllerDetails: '',
         categoriesOfProcessing: [],
-        legalBasis: (enabledLegalBases[0] || '') as LegalBasis,
-        retentionPeriod: '3 Years',
-        hasRetentionPolicy: true,
-        personalDataCategories: allPersonalData,
-        involvesHighRiskData: hasHighRisk,
-        transferSafeguards: 'EU Standard Contractual Clauses (SCCs)',
-        toms: ['Activity logging', 'Encryption at rest', 'Encryption in transit', 'Role Based Access Controls']
-          .filter(item => enabledToms.includes(item)),
+        legalBasis: '' as LegalBasis,
+        retentionPeriod: '',
+        personalDataCategories: [],
+        involvesHighRiskData: false,
+        transferSafeguards: '',
+        transferSafeguardsByDestination: {},
+        assetTransferLinks: [],
+        toms: [],
         tomsOther: '',
-        tspStatus: (enabledTspStatuses.includes('Yes') ? 'Yes' : enabledTspStatuses[0]) as any,
+        tspStatus: '' as any,
         tspJustification: '',
-        dataSubjectCategories: defaultCategories,
-        dataSubjectPersonalDataMap: defaultMap,
-        recipientCategories: [
-          enabledInternalRecipients.includes('Trimble Cloud Platform') ? 'Trimble Cloud Platform' : enabledInternalRecipients[0],
-          enabledExternalRecipients.includes('Third Party Vendors') ? 'Third Party Vendors' : enabledExternalRecipients[0],
-        ].filter(Boolean) as string[],
+        dataSubjectCategories: [],
+        dataSubjectPersonalDataMap: {},
+        recipientCategories: [],
         specifiedTrimbleProductTeam: '',
         specifiedThirdParty: '',
-        hasInternationalTransfer: 'No',
         selectedTransferRegions: [],
         internationalTransferDetails: [],
         tspIds: [],
@@ -320,13 +329,13 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
         tags: [],
       });
     }
-    const loadedSafeguard = (isEdit && recordIdToEdit
-      ? processingActivities.find(activity => activity.id === recordIdToEdit)?.transferSafeguards
-      : ''
-    )?.trim() || '';
-    const loadedIsPreset = loadedSafeguard === 'Adequacy or equivalent' || loadedSafeguard === 'SCCs';
-    setSafeguardView(loadedSafeguard && !loadedIsPreset && loadedSafeguard.toLowerCase() !== 'none' ? 'saved-text' : 'choices');
-    setOtherSafeguardDraft('');
+    const loadedActivity = isEdit && recordIdToEdit
+      ? processingActivities.find(activity => activity.id === recordIdToEdit)
+      : undefined;
+    const loadedLinks = loadedActivity ? resolveTransferLinks(loadedActivity) : [];
+    setSafeguardViews(Object.fromEntries(loadedLinks.map(link => [link.id, viewForSafeguard(link.safeguard)])));
+    setOtherSafeguardDrafts({});
+    setBlankDestinationKeys([]);
     setCurrentStep(1);
     setPendingRoleSwitch(null);
     setPendingDataSubjectRemoval(null);
@@ -374,6 +383,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
       personalDataCategories: allSelected,
       involvesHighRiskData: hasHighRisk,
     }));
+    setRevealedDataSubject(categoryName);
   };
 
   const executeRemoveDataSubjectCategory = (categoryName: string) => {
@@ -427,72 +437,167 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
     }));
   };
 
-  const handleSourceAssetChange = (assetId: string) => {
-    setFormData(prev => {
-      const currentSources = prev.dataSourceAssetIds || [];
-      const previousPrimary = currentSources[0] || '';
-      const remainingSources = currentSources.filter(id => id !== previousPrimary && id !== assetId);
-      const dataSourceAssetIds = assetId ? [assetId, ...remainingSources] : remainingSources;
-      const linkedAssetIds = new Set(prev.assetIds || []);
-      if (assetId) linkedAssetIds.add(assetId);
-      return {
-        ...prev,
-        dataSourceAssetIds,
-        assetIds: Array.from(linkedAssetIds),
-      };
-    });
-  };
-
-  const handleDestinationAssetChange = (assetId: string) => {
-    setFormData(prev => {
-      const currentDestinations = prev.dataDestinationAssetIds || [];
-      const previousPrimary = currentDestinations[0] || '';
-      const remainingDestinations = currentDestinations.filter(id => id !== previousPrimary && id !== assetId);
-      const dataDestinationAssetIds = assetId ? [assetId, ...remainingDestinations] : remainingDestinations;
-      const linkedAssetIds = new Set(prev.assetIds || []);
-      if (assetId) linkedAssetIds.add(assetId);
-      return {
-        ...prev,
-        dataDestinationAssetIds,
-        assetIds: Array.from(linkedAssetIds),
-      };
-    });
-  };
-
   const sourceAssetId = formData.dataSourceAssetIds?.[0] || '';
   const sourceAsset = assets.find(asset => asset.id === sourceAssetId);
   const sourceLocationPreview = sourceAsset?.primaryHostingLocation?.trim() || 'No primary hosting location recorded';
-  const destinationAssetId = formData.dataDestinationAssetIds?.[0] || '';
-  const destinationAsset = assets.find(asset => asset.id === destinationAssetId);
-  const destinationLocationPreview = destinationAsset?.primaryHostingLocation?.trim() || 'No primary hosting location recorded';
-  const storedSafeguard = (formData.transferSafeguards || '').trim();
-  const selectedSafeguardPreset =
-    storedSafeguard === 'Adequacy or equivalent' || storedSafeguard === 'SCCs'
-      ? storedSafeguard
-      : '';
-  const savedOtherSafeguard =
-    safeguardView === 'saved-text' && storedSafeguard && !selectedSafeguardPreset
-      ? storedSafeguard
-      : '';
+  const destinationAssetIds = formData.dataDestinationAssetIds || [];
+  const transferLinks = formData.assetTransferLinks || [];
+  const blankRows = destinationAssetIds.length === 0 && blankDestinationKeys.length === 0
+    ? ['pending-destination']
+    : blankDestinationKeys;
 
-  const returnToSafeguardChoices = () => {
-    setSafeguardView('choices');
-    setOtherSafeguardDraft('');
-    setFormData(prev => ({ ...prev, transferSafeguards: '' }));
+  const assetName = (assetId: string) => assets.find(asset => asset.id === assetId)?.name || assetId;
+
+  const remapSafeguardState = (idMap: Map<string, string>) => {
+    setSafeguardViews(prev => Object.fromEntries(
+      Object.entries(prev).flatMap(([id, view]) => {
+        const nextId = idMap.get(id);
+        return nextId ? [[nextId, view]] : [];
+      })
+    ));
+    setOtherSafeguardDrafts(prev => Object.fromEntries(
+      Object.entries(prev).flatMap(([id, draft]) => {
+        const nextId = idMap.get(id);
+        return nextId ? [[nextId, draft]] : [];
+      })
+    ));
   };
 
-  const selectTransferSafeguard = (value: 'Adequacy or equivalent' | 'SCCs') => {
-    setSafeguardView('choices');
-    setOtherSafeguardDraft('');
-    setFormData(prev => ({ ...prev, transferSafeguards: value }));
+  const retargetLinks = (links: AssetTransferLink[], previousId: string, nextId: string) => {
+    const idMap = new Map<string, string>();
+    const seen = new Set<string>();
+    const nextLinks = links.flatMap(link => {
+      const fromAssetId = link.fromAssetId === previousId ? nextId : link.fromAssetId;
+      const toAssetId = link.toAssetId === previousId ? nextId : link.toAssetId;
+      if (!fromAssetId || !toAssetId || fromAssetId === toAssetId) return [];
+      const id = transferLinkId(fromAssetId, toAssetId);
+      if (seen.has(id)) return [];
+      seen.add(id);
+      idMap.set(link.id, id);
+      return [{ ...link, id, fromAssetId, toAssetId }];
+    });
+    return { links: nextLinks, idMap };
   };
 
-  const saveOtherTransferSafeguard = () => {
-    const value = otherSafeguardDraft.trim();
-    if (!value) return;
-    setFormData(prev => ({ ...prev, transferSafeguards: value }));
-    setOtherSafeguardDraft('');
-    setSafeguardView('saved-text');
+  const writeFlow = (
+    destinationIds: string[],
+    links: AssetTransferLink[],
+    assetIdToLink?: string,
+  ) => {
+    const safeguards = safeguardsFromLinks(links);
+    setFormData(prev => {
+      const linkedAssetIds = new Set(prev.assetIds || []);
+      if (assetIdToLink) linkedAssetIds.add(assetIdToLink);
+      return {
+        ...prev,
+        dataDestinationAssetIds: destinationIds,
+        assetTransferLinks: links,
+        transferSafeguardsByDestination: safeguards,
+        transferSafeguards: primaryTransferSafeguard(destinationIds, safeguards),
+        assetIds: assetIdToLink ? Array.from(linkedAssetIds) : prev.assetIds,
+      };
+    });
+  };
+
+  const handleSourceAssetChange = (assetId: string) => {
+    const previousPrimary = sourceAssetId;
+    const remainingSources = (formData.dataSourceAssetIds || []).filter(id => id !== previousPrimary && id !== assetId);
+    const dataSourceAssetIds = assetId ? [assetId, ...remainingSources] : remainingSources;
+    const dataDestinationAssetIds = destinationAssetIds.filter(id => id !== assetId);
+    let links = transferLinks.filter(link => link.fromAssetId !== assetId && link.toAssetId !== assetId);
+    const idMap = new Map<string, string>();
+    if (previousPrimary && assetId && previousPrimary !== assetId) {
+      const retargeted = retargetLinks(links, previousPrimary, assetId);
+      links = retargeted.links;
+      retargeted.idMap.forEach((nextId, previousId) => idMap.set(previousId, nextId));
+    }
+    const linkedAssetIds = new Set(formData.assetIds || []);
+    if (assetId) linkedAssetIds.add(assetId);
+    const safeguards = safeguardsFromLinks(links);
+    setFormData(prev => ({
+      ...prev,
+      dataSourceAssetIds,
+      dataDestinationAssetIds,
+      assetTransferLinks: links,
+      transferSafeguardsByDestination: safeguards,
+      transferSafeguards: primaryTransferSafeguard(dataDestinationAssetIds, safeguards),
+      assetIds: Array.from(linkedAssetIds),
+    }));
+    if (idMap.size > 0) remapSafeguardState(idMap);
+  };
+
+  const addDestinationAsset = (assetId: string) => {
+    if (!assetId || assetId === sourceAssetId || destinationAssetIds.includes(assetId)) return;
+    writeFlow([...destinationAssetIds, assetId], transferLinks, assetId);
+  };
+
+  const transferSourceOptions = (destinationId: string) => {
+    const ids = [
+      ...(sourceAssetId ? [sourceAssetId] : []),
+      ...destinationAssetIds.filter(id => id && id !== destinationId),
+    ].filter((id, index, all) => all.indexOf(id) === index);
+    return ids.map(id => ({ value: id, label: `${assetName(id)} (${id})` }));
+  };
+
+  const setDestinationSource = (destinationId: string, fromAssetId: string) => {
+    if (!destinationAssetIds.includes(destinationId)) return;
+    const incoming = transferLinks.filter(link => link.toAssetId === destinationId);
+    const rest = transferLinks.filter(link => link.toAssetId !== destinationId);
+    if (!fromAssetId) {
+      const removedIds = new Set(incoming.map(link => link.id));
+      writeFlow(destinationAssetIds, rest);
+      setSafeguardViews(prev => Object.fromEntries(Object.entries(prev).filter(([id]) => !removedIds.has(id))));
+      setOtherSafeguardDrafts(prev => Object.fromEntries(Object.entries(prev).filter(([id]) => !removedIds.has(id))));
+      return;
+    }
+    const eligible = new Set(transferSourceOptions(destinationId).map(option => option.value));
+    if (!eligible.has(fromAssetId)) return;
+    if (incoming.length === 1 && incoming[0].fromAssetId === fromAssetId) return;
+    const kept = incoming.find(link => link.fromAssetId === fromAssetId) || incoming[0];
+    const nextLink = createTransferLink(fromAssetId, destinationId, kept?.safeguard || '');
+    const idMap = new Map<string, string>();
+    rest.forEach(link => idMap.set(link.id, link.id));
+    if (kept) idMap.set(kept.id, nextLink.id);
+    writeFlow(destinationAssetIds, [...rest, nextLink]);
+    remapSafeguardState(idMap);
+    if (!kept) {
+      setSafeguardViews(prev => ({ ...prev, [nextLink.id]: 'choices' }));
+      setOtherSafeguardDrafts(prev => ({ ...prev, [nextLink.id]: '' }));
+    }
+  };
+
+  const replaceDestinationAsset = (previousAssetId: string, nextAssetId: string) => {
+    if (!nextAssetId || nextAssetId === sourceAssetId || nextAssetId === previousAssetId) return;
+    if (!destinationAssetIds.includes(previousAssetId) || destinationAssetIds.includes(nextAssetId)) return;
+    const { links, idMap } = retargetLinks(transferLinks, previousAssetId, nextAssetId);
+    writeFlow(
+      destinationAssetIds.map(id => (id === previousAssetId ? nextAssetId : id)),
+      links,
+      nextAssetId,
+    );
+    remapSafeguardState(idMap);
+  };
+
+  const removeDestinationAsset = (assetId: string) => {
+    if (!destinationAssetIds.includes(assetId)) return;
+    const removedIds = new Set(transferLinks.filter(link => link.fromAssetId === assetId || link.toAssetId === assetId).map(link => link.id));
+    writeFlow(
+      destinationAssetIds.filter(id => id !== assetId),
+      transferLinks.filter(link => link.fromAssetId !== assetId && link.toAssetId !== assetId),
+    );
+    setSafeguardViews(prev => Object.fromEntries(Object.entries(prev).filter(([id]) => !removedIds.has(id))));
+    setOtherSafeguardDrafts(prev => Object.fromEntries(Object.entries(prev).filter(([id]) => !removedIds.has(id))));
+  };
+
+  const updateLinkSafeguard = (linkId: string, value: string, view: SafeguardView) => {
+    writeFlow(
+      destinationAssetIds,
+      transferLinks.map(link => link.id === linkId ? { ...link, safeguard: value } : link),
+    );
+    setSafeguardViews(prev => ({ ...prev, [linkId]: view }));
+    if (view !== 'other-draft') {
+      setOtherSafeguardDrafts(prev => ({ ...prev, [linkId]: '' }));
+    }
   };
 
   // Role switch handler with warning confirmation
@@ -531,6 +636,11 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
       } else if (usesControllerWizardOptions(newRole) && usesProcessorWizardOptions(prev.role)) {
         updated.categoriesOfProcessing = [];
         updated.processorAndControllerDetails = '';
+      }
+      if (newRole === 'Processor (B2B sales only)') {
+        updated.legalBasis = 'Contractual Obligation';
+      } else if (prev.role === 'Processor (B2B sales only)' && prev.legalBasis === 'Contractual Obligation') {
+        updated.legalBasis = '';
       }
       return updated;
     });
@@ -579,7 +689,17 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
     }
 
     // Step 2: Role
-    if (usesControllerWizardOptions(formData.role)) {
+    if (!formData.role) {
+      errors.push({
+        id: 'err-role',
+        type: 'ERROR',
+        step: 2,
+        stepName: 'Role',
+        field: 'Processing Role',
+        message: 'Processing role is required',
+        description: 'Select whether this activity is handled as a Controller or Processor.',
+      });
+    } else if (usesControllerWizardOptions(formData.role)) {
       if (!formData.purpose || !formData.purpose.trim()) {
         errors.push({
           id: 'err-purpose',
@@ -605,13 +725,13 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
       }
     }
 
-    // Step 3: Data Subjects & Data
+    // Step 3: Personal Data
     if (!formData.dataSubjectCategories || formData.dataSubjectCategories.length === 0) {
       warnings.push({
         id: 'warn-ds-cats',
         type: 'WARNING',
         step: 3,
-        stepName: 'Data Subjects & Data',
+        stepName: 'Personal Data',
         field: 'Data Subject Categories',
         message: 'No Data Subject categories selected',
         description: 'Assign data subject categories (e.g. Customers, Employees) to map personal data.',
@@ -622,20 +742,20 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
         id: 'warn-high-risk',
         type: 'WARNING',
         step: 3,
-        stepName: 'Data Subjects & Data',
+        stepName: 'Personal Data',
         field: 'High-Risk Data',
         message: 'High-risk personal data categories involved',
         description: 'Requires a formal Data Protection Impact Assessment (DPIA) under GDPR Art. 35.',
       });
     }
 
-    // Step 4: Recipients
+    // Step 4: Categories of Recipients
     if (formData.recipientCategories?.includes('Other Trimble Product Team') && !formData.specifiedTrimbleProductTeam?.trim()) {
       errors.push({
         id: 'err-spec-team',
         type: 'ERROR',
         step: 4,
-        stepName: 'Recipients',
+        stepName: 'Categories of Recipients',
         field: 'Trimble Product Team Details',
         message: 'Trimble Product Team details required for internal recipient',
         description: 'Specify the specific internal Trimble Product Team entity.',
@@ -646,7 +766,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
         id: 'err-spec-tp',
         type: 'ERROR',
         step: 4,
-        stepName: 'Recipients',
+        stepName: 'Categories of Recipients',
         field: 'Third Party Details',
         message: 'Third Party details required for external recipient',
         description: 'Specify the external third-party recipient organization.',
@@ -666,14 +786,51 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
       });
     }
 
-    // Step 6: Retention & Legal Basis
-    const retentionType = formData.retentionPolicyType ?? (formData.hasRetentionPolicy ? 'Custom' : 'None');
-    if (retentionType === 'None' || !formData.hasRetentionPolicy || formData.retentionPeriod === 'None' || !formData.retentionPeriod) {
+    // Step 2: Legal basis
+    if (usesControllerWizardOptions(formData.role) || formData.role === 'Processor (B2B sales only)') {
+      if (!formData.legalBasis || !formData.legalBasis.trim()) {
+        errors.push({
+          id: 'err-legal-basis',
+          type: 'ERROR',
+          step: 2,
+          stepName: 'Role',
+          field: 'Art. 6 Legal Basis',
+          message: 'Art. 6 Legal Basis selection is required',
+          description: 'Select the primary lawful basis under GDPR Art. 6(1).',
+        });
+      } else if (formData.legalBasis === 'Legitimate Interest of the Controller' || formData.legalBasis === 'Legitimate Interest') {
+        if (!formData.liaFiled) {
+          warnings.push({
+            id: 'warn-lia-unconfirmed',
+            type: 'WARNING',
+            step: 2,
+            stepName: 'Role',
+            field: 'LIA Confirmation',
+            message: 'Legitimate Interest selected but LIA has not been confirmed.',
+            description: 'A Legitimate Interest Assessment (LIA) document should be conducted and recorded.',
+          });
+        }
+      }
+    } else if (formData.role) {
+      infos.push({
+        id: 'info-processor-legal-basis',
+        type: 'INFO',
+        step: 2,
+        stepName: 'Role',
+        field: 'Processor Legal Basis',
+        message: 'Controller legal basis requirements (GDPR Art. 6) are established by the Controller entity.',
+        description: 'As a Processor, processing is executed under controller instructions per the DPA.',
+      });
+    }
+
+    // Step 6: Data Retention
+    const retentionType = selectedRetentionType(formData);
+    if (retentionType !== 'Custom' || formData.retentionPeriod === 'None' || !formData.retentionPeriod?.trim()) {
       warnings.push({
         id: 'warn-retention-none',
         type: 'WARNING',
         step: 6,
-        stepName: 'Retention & Legal Basis',
+        stepName: 'Data Retention',
         field: 'Retention Policy',
         message: 'No defined data retention policy.',
         description: 'Operating without a defined retention policy poses compliance risk (GDPR Art. 5(1)(e)).',
@@ -684,48 +841,12 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
           id: 'err-retention-desc',
           type: 'ERROR',
           step: 6,
-          stepName: 'Retention & Legal Basis',
+          stepName: 'Data Retention',
           field: 'Retention Policy Description',
           message: 'Retention policy description is required when Custom is selected',
           description: 'Specify retention duration or deletion trigger criteria.',
         });
       }
-    }
-
-    if (usesControllerWizardOptions(formData.role)) {
-      if (!formData.legalBasis || !formData.legalBasis.trim()) {
-        errors.push({
-          id: 'err-legal-basis',
-          type: 'ERROR',
-          step: 6,
-          stepName: 'Retention & Legal Basis',
-          field: 'Art. 6 Legal Basis',
-          message: 'Art. 6 Legal Basis selection is required',
-          description: 'Select the primary lawful basis under GDPR Art. 6(1).',
-        });
-      } else if (formData.legalBasis === 'Legitimate Interest of the Controller' || formData.legalBasis === 'Legitimate Interest') {
-        if (!formData.liaFiled) {
-          warnings.push({
-            id: 'warn-lia-unconfirmed',
-            type: 'WARNING',
-            step: 6,
-            stepName: 'Retention & Legal Basis',
-            field: 'LIA Confirmation',
-            message: 'Legitimate Interest selected but LIA has not been confirmed.',
-            description: 'A Legitimate Interest Assessment (LIA) document should be conducted and recorded.',
-          });
-        }
-      }
-    } else {
-      infos.push({
-        id: 'info-processor-legal-basis',
-        type: 'INFO',
-        step: 6,
-        stepName: 'Retention & Legal Basis',
-        field: 'Processor Legal Basis',
-        message: 'Controller legal basis requirements (GDPR Art. 6) are established by the Controller entity.',
-        description: 'As a Processor, processing is executed under controller instructions per the DPA.',
-      });
     }
 
     // Step 7: Security Measures (TOMs & TSP Registration)
@@ -800,13 +921,14 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
     if (usesControllerWizardOptions(formData.role) ? formData.purpose : formData.categoriesOfProcessing?.length) score += 10;
     if (formData.dataSubjectCategories?.length) score += 15;
     if (formData.retentionPolicyType === 'Custom' && formData.retentionPeriod?.trim() && formData.retentionPeriod !== 'None') score += 15;
-    if (usesControllerWizardOptions(formData.role) ? formData.legalBasis : true) score += 10;
+    if (
+      formData.role &&
+      ((usesControllerWizardOptions(formData.role) || formData.role === 'Processor (B2B sales only)')
+        ? Boolean(formData.legalBasis)
+        : true)
+    ) score += 10;
     return Math.min(100, score);
   }, [formData]);
-
-  const warnings = useMemo(() => {
-    return [...validationReport.errors, ...validationReport.warnings].map(i => `${i.message} (${i.stepName})`);
-  }, [validationReport]);
 
   // Form Submission
   const handleSaveDraft = () => {
@@ -868,10 +990,11 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                 </span>
                 <span className="text-slate-500">•</span>
                 <select
-                  value={formData.status || 'Draft'}
+                  value={formData.status || ''}
                   onChange={e => setFormData({ ...formData, status: e.target.value as StatusType })}
                   className="bg-slate-800 border border-slate-700 text-slate-200 text-xs font-semibold rounded px-2 py-0.5 focus:outline-none focus:border-indigo-500"
                 >
+                  <option value="">Select status</option>
                   {statusOptions.map(option => (
                     <option key={option} value={option}>{option}</option>
                   ))}
@@ -912,24 +1035,6 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
             </button>
           </div>
         </div>
-
-        {/* VALIDATION WARNINGS BANNER */}
-        {warnings.length > 0 && (
-          <div className="bg-amber-50 border-b border-amber-200 px-6 py-2 flex items-center justify-between text-xs text-amber-900 shrink-0">
-            <div className="flex items-center gap-2 overflow-x-auto py-0.5">
-              <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
-              <span className="font-semibold shrink-0">Validation Gaps ({warnings.length}):</span>
-              <span className="text-amber-800 truncate">{warnings.join(' • ')}</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => setCurrentStep(1)}
-              className="text-[11px] font-bold text-amber-900 hover:underline shrink-0 ml-3"
-            >
-              Fix Missing Fields
-            </button>
-          </div>
-        )}
 
         {/* STEP-BASED NAVIGATION HEADER */}
         <div className="bg-slate-50 border-b border-slate-200 px-4 py-2 flex items-center gap-1 overflow-x-auto shrink-0 scrollbar-none">
@@ -1168,6 +1273,86 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                   </div>
                 </div>
               )}
+
+              {formData.role && (
+              <div className="bg-slate-50 p-4.5 rounded-xl border border-slate-200 space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-200 pb-2.5">
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                      <Shield className="w-4 h-4 text-indigo-600" />
+                      Legal Basis for Processing
+                    </h4>
+                    <p className="text-xs text-slate-500">
+                      Identify the Article 6 GDPR legal basis governing this processing activity.
+                    </p>
+                  </div>
+                </div>
+
+                {usesControllerWizardOptions(formData.role) || formData.role === 'Processor (B2B sales only)' ? (
+                  <div className="space-y-4">
+                    <Select
+                      label="Art. 6 Legal Basis for Controller Processing"
+                      options={legalBasisOptions}
+                      value={formData.legalBasis || ''}
+                      onChange={e =>
+                        setFormData(prev => ({
+                          ...prev,
+                          legalBasis: e.target.value as LegalBasis,
+                        }))
+                      }
+                      required
+                    />
+
+                    {(formData.legalBasis === 'Legitimate Interest of the Controller' || formData.legalBasis === 'Legitimate Interest') && (
+                      <div className="p-4 rounded-lg bg-amber-50/80 border border-amber-300 space-y-3 animate-in fade-in duration-150">
+                        <label className="flex items-start gap-2.5 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(formData.liaFiled)}
+                            onChange={e =>
+                              setFormData(prev => ({
+                                ...prev,
+                                liaFiled: e.target.checked,
+                              }))
+                            }
+                            className="w-4 h-4 rounded border-amber-400 text-amber-600 focus:ring-amber-500 mt-0.5"
+                          />
+                          <div>
+                            <span className="font-bold text-xs text-amber-950 block">
+                              A LIA has been filed for this processing activity.
+                            </span>
+                            <span className="text-[11px] text-amber-800 block mt-0.5">
+                              Check this box if a Legitimate Interest Assessment (LIA) balancing test has been documented and approved by Privacy & Legal.
+                            </span>
+                          </div>
+                        </label>
+
+                        {!formData.liaFiled && (
+                          <div className="flex items-start gap-2 text-xs text-amber-900 bg-amber-100/70 p-2.5 rounded border border-amber-300 font-medium">
+                            <AlertCircle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                            <span>
+                              <strong>Warning:</strong> Legitimate Interest selected but LIA has not been confirmed. Draft saves are allowed, but LIA confirmation is required for final privacy approval.
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="p-4 rounded-lg bg-blue-50/80 border border-blue-200 text-blue-900 flex items-start gap-3">
+                    <Info className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
+                    <div className="space-y-1 text-xs">
+                      <span className="font-bold text-blue-950 block">
+                        Controller Legal Basis Requirements Not Applicable to Processor Role
+                      </span>
+                      <p className="text-blue-800 text-[11px]">
+                        As a Processor, legal basis for processing (GDPR Art. 6) is established and documented by the Controller entity. Processing activities performed by Trimble as a Processor are governed by the underlying Data Processing Agreement (DPA) and Controller instructions.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+              )}
             </div>
           )}
 
@@ -1178,7 +1363,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
               <div className="border-b border-slate-200 pb-3">
                 <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
                   <User className="w-5 h-5 text-indigo-600" />
-                  Step 3: Data Subjects & Data
+                  Step 3: Personal Data
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
                   Select target Data Subject categories and map individual personal data items from the centrally managed catalog to each group.
@@ -1303,6 +1488,11 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                       availableDataItems={configuredPersonalDataItems}
                       onChangeDataItems={newItems => handleUpdateItemsForSubjectCategory(cat, newItems)}
                       onRemoveSubjectCategory={() => handleToggleDataSubjectCategory(cat)}
+                      reveal={
+                        revealedDataSubject
+                          ? revealedDataSubject === cat
+                          : cat === formData.dataSubjectCategories?.[0]
+                      }
                     />
                   ))
                 )}
@@ -1315,7 +1505,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
               <div className="border-b border-slate-200 pb-3">
                 <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
                   <Building className="w-5 h-5 text-indigo-600" />
-                  Step 4: Categories of Recipients & Data Disclosures
+                  Step 4: Categories of Recipients
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
                   Select internal teams, external recipient categories, and link relevant third-party vendors.
@@ -1550,140 +1740,174 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
               )}
 
               {formData.hasInternationalTransfer === 'Yes' && (
-                <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-4 animate-in fade-in duration-150">
-                  <Select
-                    label="What is the destination asset/system?"
-                    options={[...assets]
+                <div className="space-y-4 animate-in fade-in duration-150">
+                  {destinationAssetIds.map(assetId => {
+                    const destinationAsset = assets.find(asset => asset.id === assetId);
+                    const destinationOptions = [...assets]
+                      .filter(asset => asset.id === assetId || (asset.id !== sourceAssetId && !destinationAssetIds.includes(asset.id)))
                       .sort((a, b) => a.name.localeCompare(b.name))
-                      .map(asset => ({ value: asset.id, label: `${asset.name} (${asset.id})` }))}
-                    value={destinationAssetId}
-                    onChange={event => handleDestinationAssetChange(event.target.value)}
-                    placeholder="Select a destination asset or system"
-                  />
-                  {destinationAsset && (
-                    <>
-                      <div className="max-w-2xl">
-                        <label
-                          htmlFor="destination-location-preview"
-                          className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5"
-                        >
-                          Destination Location
-                        </label>
-                        <input
-                          id="destination-location-preview"
-                          value={destinationLocationPreview}
-                          readOnly
-                          tabIndex={-1}
-                          className="w-full rounded-md border border-slate-200 bg-slate-100 px-3 py-2 text-sm text-slate-500 cursor-default focus:outline-none"
-                        />
-                      </div>
-
-                      <div className="space-y-3 border-t border-slate-200 pt-4">
-                    <label className="block text-xs font-bold text-slate-900">
-                      What transfer safeguards are in place between the source and destination assets?
-                    </label>
-                    {safeguardView === 'other-draft' ? (
-                      <div className="relative max-w-xl">
-                        <input
-                          type="text"
-                          value={otherSafeguardDraft}
-                          onChange={event => setOtherSafeguardDraft(event.target.value)}
-                          onKeyDown={event => {
-                            if (event.key === 'Enter') {
-                              event.preventDefault();
-                              saveOtherTransferSafeguard();
-                            }
-                          }}
-                          placeholder="Describe the transfer safeguard"
-                          aria-label="Other transfer safeguard"
-                          className="w-full rounded-md border border-slate-300 bg-white py-2 pl-3 pr-10 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-800"
-                        />
-                        <button
-                          type="button"
-                          onClick={saveOtherTransferSafeguard}
-                          disabled={!otherSafeguardDraft.trim()}
-                          aria-label="Save transfer safeguard"
-                          className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-1 text-indigo-700 hover:bg-indigo-50 disabled:text-slate-300 disabled:hover:bg-transparent"
-                        >
-                          <Check className="w-4 h-4" />
-                        </button>
-                      </div>
-                    ) : safeguardView === 'saved-text' && savedOtherSafeguard ? (
-                      <div className="inline-flex items-center gap-1 rounded-lg border border-indigo-300 bg-indigo-50 pl-3.5 pr-1 py-1">
-                        <button
-                          type="button"
-                          onClick={returnToSafeguardChoices}
-                          className="cursor-pointer text-left text-xs font-semibold text-indigo-950"
-                        >
-                          {savedOtherSafeguard}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={returnToSafeguardChoices}
-                          aria-label="Remove saved safeguard"
-                          className="cursor-pointer rounded p-1 text-indigo-700 hover:bg-indigo-100 hover:text-indigo-950"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="flex flex-wrap items-center gap-3">
-                        {(['Adequacy or equivalent', 'SCCs', 'Other'] as const).map(option => (
-                          <label
-                            key={option}
-                            className={`flex items-center gap-2 px-3.5 py-2 rounded-lg border text-xs font-semibold cursor-pointer transition ${
-                              option !== 'Other' && selectedSafeguardPreset === option
-                                ? 'bg-indigo-50 border-indigo-300 text-indigo-950 shadow-2xs'
-                                : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100/80'
-                            }`}
-                          >
-                            <input
-                              type="radio"
-                              name="transferSafeguard"
-                              value={option}
-                              checked={option !== 'Other' && selectedSafeguardPreset === option}
-                              onClick={() => {
-                                if (option !== 'Other' && selectedSafeguardPreset === option) {
-                                  returnToSafeguardChoices();
-                                }
-                              }}
-                              onChange={() => {
-                                if (option === 'Other') {
-                                  setOtherSafeguardDraft('');
-                                  setSafeguardView('other-draft');
+                      .map(asset => ({ value: asset.id, label: `${asset.name} (${asset.id})` }));
+                    const location = destinationAsset?.primaryHostingLocation?.trim() || 'No primary hosting location recorded';
+                    const sourceOptions = transferSourceOptions(assetId);
+                    const incomingSources = transferLinks.filter(link => link.toAssetId === assetId).map(link => link.fromAssetId);
+                    const selectedTransferSource = incomingSources.length === 1 && sourceOptions.some(option => option.value === incomingSources[0])
+                      ? incomingSources[0]
+                      : '';
+                    return (
+                      <div key={assetId} className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <Select
+                              id={`destination-asset-${assetId}`}
+                              label="What is the destination asset/system?"
+                              options={destinationOptions}
+                              value={assetId}
+                              onChange={event => {
+                                const nextId = event.target.value;
+                                if (!nextId) {
+                                  removeDestinationAsset(assetId);
                                   return;
                                 }
-                                if (selectedSafeguardPreset === option) {
-                                  returnToSafeguardChoices();
-                                  return;
-                                }
-                                selectTransferSafeguard(option);
+                                replaceDestinationAsset(assetId, nextId);
                               }}
-                              className="text-indigo-600 focus:ring-indigo-500"
+                              placeholder="Select a destination asset or system"
                             />
-                            {option}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeDestinationAsset(assetId)}
+                            aria-label="Remove destination asset"
+                            className="mt-6 rounded p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-700"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                        <Select
+                          id={`destination-source-${assetId}`}
+                          label="What is the source asset/system for this transfer?"
+                          options={sourceOptions}
+                          value={selectedTransferSource}
+                          onChange={event => setDestinationSource(assetId, event.target.value)}
+                          placeholder="Select a source asset or system"
+                          helperText="Choose the source asset, or a destination already added on this screen."
+                        />
+                        <div className="max-w-2xl">
+                          <label
+                            htmlFor={`destination-location-${assetId}`}
+                            className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5"
+                          >
+                            Destination Location
                           </label>
+                          <input
+                            id={`destination-location-${assetId}`}
+                            value={location}
+                            readOnly
+                            tabIndex={-1}
+                            className="w-full rounded-md border border-slate-200 bg-slate-100 px-3 py-2 text-sm text-slate-500 cursor-default focus:outline-none"
+                          />
+                        </div>
+                        {transferLinks.filter(link => link.toAssetId === assetId).map(link => (
+                          <DestinationSafeguardControl
+                            key={link.id}
+                            assetId={link.id}
+                            question={`What transfer safeguards are in place between ${assetName(link.fromAssetId)} and ${assetName(link.toAssetId)}?`}
+                            value={(link.safeguard || '').trim()}
+                            view={safeguardViews[link.id] || 'choices'}
+                            draft={otherSafeguardDrafts[link.id] || ''}
+                            onSelectPreset={(id, value) => updateLinkSafeguard(id, value, 'choices')}
+                            onClear={id => updateLinkSafeguard(id, '', 'choices')}
+                            onStartOther={id => {
+                              setOtherSafeguardDrafts(prev => ({ ...prev, [id]: '' }));
+                              setSafeguardViews(prev => ({ ...prev, [id]: 'other-draft' }));
+                            }}
+                            onDraftChange={(id, draft) => setOtherSafeguardDrafts(prev => ({ ...prev, [id]: draft }))}
+                            onSaveOther={id => {
+                              const draft = (otherSafeguardDrafts[id] || '').trim();
+                              if (!draft) return;
+                              updateLinkSafeguard(id, draft, 'saved-text');
+                            }}
+                          />
                         ))}
                       </div>
-                    )}
+                    );
+                  })}
+
+                  {blankRows.map(blankKey => {
+                    const destinationOptions = [...assets]
+                      .filter(asset => asset.id !== sourceAssetId && !destinationAssetIds.includes(asset.id))
+                      .sort((a, b) => a.name.localeCompare(b.name))
+                      .map(asset => ({ value: asset.id, label: `${asset.name} (${asset.id})` }));
+                    return (
+                      <div key={blankKey} className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <Select
+                              id={`destination-asset-${blankKey}`}
+                              label="What is the destination asset/system?"
+                              options={destinationOptions}
+                              value=""
+                              onChange={event => {
+                                const nextId = event.target.value;
+                                if (!nextId) return;
+                                addDestinationAsset(nextId);
+                                setBlankDestinationKeys(keys => keys.filter(key => key !== blankKey));
+                              }}
+                              placeholder="Select a destination asset or system"
+                            />
+                          </div>
+                          {blankKey !== 'pending-destination' && (
+                            <button
+                              type="button"
+                              onClick={() => setBlankDestinationKeys(keys => keys.filter(key => key !== blankKey))}
+                              aria-label="Remove destination asset"
+                              className="mt-6 rounded p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-700"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
                       </div>
-                    </>
-                  )}
+                    );
+                  })}
+
+                  <button
+                    type="button"
+                    onClick={() => setBlankDestinationKeys(keys => {
+                      const base = destinationAssetIds.length === 0 && keys.length === 0
+                        ? ['pending-destination']
+                        : keys;
+                      return [...base, `blank-${Date.now()}`];
+                    })}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Add another destination asset for this processing activity?
+                  </button>
+
+                  <div className="p-4 bg-white rounded-xl border border-slate-200">
+                    <ActivityTransferChart
+                      assets={assets}
+                      sourceAssetId={sourceAssetId}
+                      destinationAssetIds={destinationAssetIds}
+                      links={transferLinks}
+                      editable
+                    />
+                  </div>
                 </div>
               )}
             </div>
           )}
 
-          {/* STEP 7: RETENTION & LEGAL BASIS */}
+          {/* STEP 6: DATA RETENTION */}
           {currentStep === 6 && (
             <div className="space-y-6 animate-in fade-in duration-150">
               <div className="border-b border-slate-200 pb-3">
                 <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
                   <Clock className="w-5 h-5 text-indigo-600" />
-                  Step 6: Data Retention Policy & Legal Basis for Processing
+                  Step 6: Data Retention
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Define statutory data retention limits, policy descriptions, and GDPR Art. 6 legal basis for processing activities.
+                  Define statutory data retention limits and policy descriptions for this processing activity.
                 </p>
               </div>
 
@@ -1718,19 +1942,19 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                         }))
                       }
                       className={`p-3.5 rounded-lg border text-left transition flex items-start gap-3 ${
-                        (formData.retentionPolicyType ?? (formData.hasRetentionPolicy ? 'Custom' : 'None')) === 'Custom'
+                        selectedRetentionType(formData) === 'Custom'
                           ? 'border-indigo-600 bg-indigo-50/60 ring-2 ring-indigo-500/20'
                           : 'border-slate-200 bg-white hover:border-slate-300'
                       }`}
                     >
                       <div
                         className={`w-4 h-4 rounded-full border mt-0.5 shrink-0 flex items-center justify-center ${
-                          (formData.retentionPolicyType ?? (formData.hasRetentionPolicy ? 'Custom' : 'None')) === 'Custom'
+                          selectedRetentionType(formData) === 'Custom'
                             ? 'border-indigo-600 bg-indigo-600'
                             : 'border-slate-300 bg-white'
                         }`}
                       >
-                        {(formData.retentionPolicyType ?? (formData.hasRetentionPolicy ? 'Custom' : 'None')) === 'Custom' && (
+                        {selectedRetentionType(formData) === 'Custom' && (
                           <div className="w-1.5 h-1.5 rounded-full bg-white" />
                         )}
                       </div>
@@ -1753,19 +1977,19 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                         }))
                       }
                       className={`p-3.5 rounded-lg border text-left transition flex items-start gap-3 ${
-                        (formData.retentionPolicyType ?? (formData.hasRetentionPolicy ? 'Custom' : 'None')) === 'None'
+                        selectedRetentionType(formData) === 'None'
                           ? 'border-rose-400 bg-rose-50/70 ring-2 ring-rose-500/20'
                           : 'border-slate-200 bg-white hover:border-slate-300'
                       }`}
                     >
                       <div
                         className={`w-4 h-4 rounded-full border mt-0.5 shrink-0 flex items-center justify-center ${
-                          (formData.retentionPolicyType ?? (formData.hasRetentionPolicy ? 'Custom' : 'None')) === 'None'
+                          selectedRetentionType(formData) === 'None'
                             ? 'border-rose-600 bg-rose-600'
                             : 'border-slate-300 bg-white'
                         }`}
                       >
-                        {(formData.retentionPolicyType ?? (formData.hasRetentionPolicy ? 'Custom' : 'None')) === 'None' && (
+                        {selectedRetentionType(formData) === 'None' && (
                           <div className="w-1.5 h-1.5 rounded-full bg-white" />
                         )}
                       </div>
@@ -1779,7 +2003,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                   </div>
 
                   {/* Custom Option: Required Text Field */}
-                  {(formData.retentionPolicyType ?? (formData.hasRetentionPolicy ? 'Custom' : 'None')) === 'Custom' && (
+                  {selectedRetentionType(formData) === 'Custom' && (
                     <div className="space-y-1.5 pt-2 animate-in fade-in duration-150">
                       <label className="text-xs font-semibold text-slate-700 block">
                         Describe the retention period or retention policy <span className="text-rose-600">*</span>
@@ -1804,7 +2028,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                   )}
 
                   {/* None Option: Red Risk Indicator */}
-                  {(formData.retentionPolicyType ?? (formData.hasRetentionPolicy ? 'Custom' : 'None')) === 'None' && (
+                  {selectedRetentionType(formData) === 'None' && (
                     <div className="p-3.5 rounded-lg bg-rose-50 border border-rose-300 text-rose-900 flex items-start gap-3 animate-in fade-in duration-150">
                       <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
                       <div>
@@ -1818,87 +2042,6 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                     </div>
                   )}
                 </div>
-              </div>
-
-              {/* LEGAL BASIS FOR PROCESSING SECTION */}
-              <div className="bg-slate-50 p-4.5 rounded-xl border border-slate-200 space-y-4">
-                <div className="flex items-center justify-between border-b border-slate-200 pb-2.5">
-                  <div>
-                    <h4 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
-                      <Shield className="w-4 h-4 text-indigo-600" />
-                      Legal Basis for Processing
-                    </h4>
-                    <p className="text-xs text-slate-500">
-                      Identify the Article 6 GDPR legal basis governing this processing activity.
-                    </p>
-                  </div>
-                </div>
-
-                {usesControllerWizardOptions(formData.role) ? (
-                  <div className="space-y-4">
-                    <Select
-                      label="Art. 6 Legal Basis for Controller Processing"
-                      options={legalBasisOptions}
-                      value={formData.legalBasis || ''}
-                      onChange={e =>
-                        setFormData(prev => ({
-                          ...prev,
-                          legalBasis: e.target.value as LegalBasis,
-                        }))
-                      }
-                      required
-                    />
-
-                    {/* Conditional LIA Checkbox when Legitimate Interest is selected */}
-                    {(formData.legalBasis === 'Legitimate Interest of the Controller' || formData.legalBasis === 'Legitimate Interest') && (
-                      <div className="p-4 rounded-lg bg-amber-50/80 border border-amber-300 space-y-3 animate-in fade-in duration-150">
-                        <label className="flex items-start gap-2.5 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={Boolean(formData.liaFiled)}
-                            onChange={e =>
-                              setFormData(prev => ({
-                                ...prev,
-                                liaFiled: e.target.checked,
-                              }))
-                            }
-                            className="w-4 h-4 rounded border-amber-400 text-amber-600 focus:ring-amber-500 mt-0.5"
-                          />
-                          <div>
-                            <span className="font-bold text-xs text-amber-950 block">
-                              A LIA has been filed for this processing activity.
-                            </span>
-                            <span className="text-[11px] text-amber-800 block mt-0.5">
-                              Check this box if a Legitimate Interest Assessment (LIA) balancing test has been documented and approved by Privacy & Legal.
-                            </span>
-                          </div>
-                        </label>
-
-                        {!formData.liaFiled && (
-                          <div className="flex items-start gap-2 text-xs text-amber-900 bg-amber-100/70 p-2.5 rounded border border-amber-300 font-medium">
-                            <AlertCircle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
-                            <span>
-                              <strong>Warning:</strong> Legitimate Interest selected but LIA has not been confirmed. Draft saves are allowed, but LIA confirmation is required for final privacy approval.
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  /* Processor-only Informative Banner */
-                  <div className="p-4 rounded-lg bg-blue-50/80 border border-blue-200 text-blue-900 flex items-start gap-3">
-                    <Info className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
-                    <div className="space-y-1 text-xs">
-                      <span className="font-bold text-blue-950 block">
-                        Controller Legal Basis Requirements Not Applicable to Processor Role
-                      </span>
-                      <p className="text-blue-800 text-[11px]">
-                        As a Processor, legal basis for processing (GDPR Art. 6) is established and documented by the Controller entity. Processing activities performed by Trimble as a Processor are governed by the underlying Data Processing Agreement (DPA) and Controller instructions.
-                      </p>
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
           )}
@@ -2214,32 +2357,9 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                   </div>
                   <div>
                     <span className="text-slate-500 font-medium">Role: </span>
-                    <strong className="text-slate-900">{formData.role}</strong>
+                    <strong className="text-slate-900">{formData.role || 'Unassigned'}</strong>
                   </div>
-                </div>
-
-                {/* 6. Retention & Legal Basis Summary */}
-                <div className="p-4 rounded-lg bg-slate-50 border border-slate-200 space-y-2 text-xs">
-                  <span className="font-bold text-slate-900 uppercase tracking-wider text-[11px] text-indigo-600 block">
-                    6. Retention & Legal Basis Summary
-                  </span>
-                  <div>
-                    <span className="text-slate-500 font-medium">Retention Policy Type: </span>
-                    <span className="font-semibold text-slate-900">
-                      {formData.retentionPolicyType ?? (formData.hasRetentionPolicy ? 'Custom' : 'None')}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 font-medium">Retention Period / Schedule: </span>
-                    {(formData.retentionPolicyType ?? (formData.hasRetentionPolicy ? 'Custom' : 'None')) === 'None' ? (
-                      <span className="font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-300 text-[11px] inline-block mt-0.5">
-                        No defined data retention policy.
-                      </span>
-                    ) : (
-                      <span className="text-slate-800 font-medium">{formData.retentionPeriod || 'None'}</span>
-                    )}
-                  </div>
-                  {usesControllerWizardOptions(formData.role) ? (
+                  {usesControllerWizardOptions(formData.role) || formData.role === 'Processor (B2B sales only)' ? (
                     <>
                       <div>
                         <span className="text-slate-500 font-medium">Art. 6 Legal Basis: </span>
@@ -2266,6 +2386,31 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                       <span className="text-slate-500 italic">Established by Controller (Processor Record)</span>
                     </div>
                   )}
+                </div>
+
+                {/* 6. Data Retention Summary */}
+                <div className="p-4 rounded-lg bg-slate-50 border border-slate-200 space-y-2 text-xs">
+                  <span className="font-bold text-slate-900 uppercase tracking-wider text-[11px] text-indigo-600 block">
+                    6. Data Retention
+                  </span>
+                  <div>
+                    <span className="text-slate-500 font-medium">Retention Policy Type: </span>
+                    <span className="font-semibold text-slate-900">
+                      {selectedRetentionType(formData) || 'Unassigned'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 font-medium">Retention Period / Schedule: </span>
+                    {selectedRetentionType(formData) === 'None' ? (
+                      <span className="font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-300 text-[11px] inline-block mt-0.5">
+                        No defined data retention policy.
+                      </span>
+                    ) : selectedRetentionType(formData) === 'Custom' ? (
+                      <span className="text-slate-800 font-medium">{formData.retentionPeriod || 'None'}</span>
+                    ) : (
+                      <span className="text-slate-500">Unassigned</span>
+                    )}
+                  </div>
                 </div>
 
                 {/* 7. Technical & Organisational Security Measures (TOMs) & TSP Summary */}

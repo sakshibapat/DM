@@ -25,6 +25,7 @@ import {
   createBackupDocument,
   migrateBackupDocument,
 } from '../utils/storageRepository';
+import { isMeaningfulSafeguard, resolveTransferLinks } from '../utils/destinationSafeguards';
 import {
   ConfigurationAuditEntry,
   InventoryConfigDocument,
@@ -44,7 +45,7 @@ interface PrivacyDataContextType {
   privacyAssessments: PrivacyAssessment[];
   
   // Navigation State
-  activeNav: string; // 'dashboard' | 'processingActivities' | 'tspReferences' | 'assets' | 'vendors' | 'entities' | 'future-assessments' | ...
+  activeNav: string; // 'dashboard' | 'processingActivities' | 'tspReferences' | 'assets' | 'vendors' | 'entities' | 'privacyAssessments' | 'ropa' | 'inventory-manager'
   setActiveNav: (nav: string) => void;
   assessmentToOpen: string | null;
   setAssessmentToOpen: (id: string | null) => void;
@@ -348,7 +349,11 @@ export const PrivacyDataProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
       // 4. International transfer without safeguard
       if (pa.hasInternationalTransfer === 'Yes') {
-        if (!pa.transferSafeguards || pa.transferSafeguards === 'None' || pa.transferSafeguards.trim() === '') {
+        const links = resolveTransferLinks(pa);
+        const missingSafeguard = (pa.dataDestinationAssetIds || []).length
+          ? links.length === 0 || links.some(link => !isMeaningfulSafeguard(link.safeguard))
+          : !isMeaningfulSafeguard(pa.transferSafeguards);
+        if (missingSafeguard) {
           list.push({
             id: `att-tsf-${pa.id}`,
             recordId: pa.id,

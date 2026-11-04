@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { usePrivacyData } from '../../context/PrivacyDataContext';
 import { ProcessingActivity, Asset, Vendor, Entity, TSPReference } from '../../types/privacy';
+import { destinationSafeguardMap } from '../../utils/destinationSafeguards';
 
 interface DataFlowDiagramProps {
   processingActivityId: string;
@@ -46,6 +47,7 @@ export const DataFlowDiagram: React.FC<DataFlowDiagramProps> = ({ processingActi
   // Resolve related records specifically for the flow
   const sourceAssets = assets.filter(a => (pa.dataSourceAssetIds || []).includes(a.id));
   const destinationAssets = assets.filter(a => (pa.dataDestinationAssetIds || []).includes(a.id));
+  const safeguardsByDestination = destinationSafeguardMap(pa);
   
   // General assets are those linked to assetIds but NOT already classified as sources or destinations
   const generalAssets = assets.filter(
@@ -247,6 +249,11 @@ export const DataFlowDiagram: React.FC<DataFlowDiagramProps> = ({ processingActi
                       <span className="text-[9px] font-mono text-slate-400 font-bold uppercase">
                         {asset.id} • {asset.primaryHostingLocation || 'Unknown Region'}
                       </span>
+                      {safeguardsByDestination[asset.id] && (
+                        <span className="text-[10px] text-slate-500 block truncate">
+                          {safeguardsByDestination[asset.id]}
+                        </span>
+                      )}
                     </div>
                   </div>
                   <ArrowRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-emerald-500 transition shrink-0 ml-1" />
