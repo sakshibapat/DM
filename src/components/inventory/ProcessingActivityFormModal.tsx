@@ -40,7 +40,6 @@ import {
   LegalBasis,
   StatusType,
   CONTROLLER_LEGAL_BASIS_OPTIONS,
-  DestinationCountryTransfer,
   usesControllerWizardOptions,
   usesProcessorWizardOptions,
 } from '../../types/privacy';
@@ -59,10 +58,6 @@ import {
 import {
   RECIPIENT_CATEGORIES_INTERNAL,
   RECIPIENT_CATEGORIES_EXTERNAL,
-  TRANSFER_REGIONS,
-  REGION_PRESET_COUNTRIES,
-  TRANSFER_SAFEGUARD_OPTIONS,
-  getInternationalTransferWarning,
 } from '../../data/recipientAndTransferCatalog';
 
 export interface ValidationIssue {
@@ -86,7 +81,7 @@ export const FORM_STEPS = [
   { id: 2, name: 'Role', icon: Shield, desc: 'Controller or Processor classification' },
   { id: 3, name: 'Data Subjects & Data', icon: User, desc: 'Personal data categories & high risk' },
   { id: 4, name: 'Recipients', icon: Building, desc: 'Internal & external disclosures' },
-  { id: 5, name: 'International Transfers', icon: Globe, desc: 'Cross-border safeguards' },
+  { id: 5, name: 'Data Flows', icon: Globe, desc: 'Cross-border safeguards' },
   { id: 6, name: 'Retention & Legal Basis', icon: Clock, desc: 'Art 6 legal basis & schedule' },
   { id: 7, name: 'Security Measures', icon: Lock, desc: 'TOMs & encryption controls' },
   { id: 8, name: 'Related Inventories', icon: Layers, desc: 'Assets, Vendors, & Entities' },
@@ -119,6 +114,8 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
   const enabledToms = getConfiguredOptions('processingActivities', 'toms');
   const enabledTspStatuses = getConfiguredOptions('processingActivities', 'tspStatuses');
   const [currentStep, setCurrentStep] = useState<number>(1);
+  const [safeguardView, setSafeguardView] = useState<'choices' | 'other-draft' | 'saved-text'>('choices');
+  const [otherSafeguardDraft, setOtherSafeguardDraft] = useState('');
 
   // Form State
   const [formData, setFormData] = useState<Partial<ProcessingActivity>>({
@@ -177,16 +174,6 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
     'processingActivities',
     'externalRecipients',
     isEdit ? (formData.recipientCategories || []).filter(value => RECIPIENT_CATEGORIES_EXTERNAL.includes(value as any)) : []
-  );
-  const transferRegionOptions = getConfiguredOptions(
-    'processingActivities',
-    'transferRegions',
-    isEdit ? formData.selectedTransferRegions || [] : []
-  );
-  const transferSafeguardOptions = getConfiguredOptions(
-    'processingActivities',
-    'transferSafeguards',
-    isEdit ? (formData.internationalTransferDetails || []).map(detail => detail.safeguard).filter(Boolean) : []
   );
   const configuredToms = getConfiguredOptions('processingActivities', 'toms', isEdit ? formData.toms || [] : []);
   const configuredTspStatuses = getConfiguredOptions('processingActivities', 'tspStatuses', isEdit ? [formData.tspStatus || ''] : []);
@@ -333,6 +320,13 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
         tags: [],
       });
     }
+    const loadedSafeguard = (isEdit && recordIdToEdit
+      ? processingActivities.find(activity => activity.id === recordIdToEdit)?.transferSafeguards
+      : ''
+    )?.trim() || '';
+    const loadedIsPreset = loadedSafeguard === 'Adequacy or equivalent' || loadedSafeguard === 'SCCs';
+    setSafeguardView(loadedSafeguard && !loadedIsPreset && loadedSafeguard.toLowerCase() !== 'none' ? 'saved-text' : 'choices');
+    setOtherSafeguardDraft('');
     setCurrentStep(1);
     setPendingRoleSwitch(null);
     setPendingDataSubjectRemoval(null);
@@ -433,83 +427,73 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
     }));
   };
 
-  // International Transfer Handlers
-  const handleToggleTransferRegion = (regionName: string) => {
-    const current = formData.selectedTransferRegions || [];
-    let updated: string[];
-    if (current.includes(regionName)) {
-      updated = current.filter(r => r !== regionName);
-    } else {
-      updated = [...current, regionName];
-    }
-    setFormData(prev => ({
-      ...prev,
-      selectedTransferRegions: updated,
-    }));
-  };
-
-  const handleAddDestinationCountry = (region: string, countryName: string) => {
-    if (!countryName.trim()) return;
-    const currentDetails = formData.internationalTransferDetails || [];
-    if (currentDetails.some(d => d.country.toLowerCase() === countryName.trim().toLowerCase())) {
-      return; // Already added
-    }
-
-    const newItem: DestinationCountryTransfer = {
-      id: 'dt-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
-      country: countryName.trim(),
-      region: region,
-      safeguard: 'SCCs',
-    };
-
-    const newDetails = [...currentDetails, newItem];
-    const newSafeguardSummary = Array.from(new Set(newDetails.map(d => d.safeguard).filter(Boolean))).join(', ');
-
-    setFormData(prev => ({
-      ...prev,
-      internationalTransferDetails: newDetails,
-      transferSafeguards: newSafeguardSummary || prev.transferSafeguards || 'EU Standard Contractual Clauses (SCCs)',
-    }));
-  };
-
-  const handleRemoveDestinationCountry = (id: string) => {
-    const currentDetails = formData.internationalTransferDetails || [];
-    const newDetails = currentDetails.filter(d => d.id !== id);
-    const newSafeguardSummary = Array.from(new Set(newDetails.map(d => d.safeguard).filter(Boolean))).join(', ');
-
-    setFormData(prev => ({
-      ...prev,
-      internationalTransferDetails: newDetails,
-      transferSafeguards: newSafeguardSummary || prev.transferSafeguards || 'None',
-    }));
-  };
-
-  const handleUpdateCountrySafeguard = (id: string, safeguard: any, specifiedSafeguard?: string) => {
-    const currentDetails = formData.internationalTransferDetails || [];
-    const newDetails = currentDetails.map(item => {
-      if (item.id === id) {
-        return {
-          ...item,
-          safeguard,
-          specifiedSafeguard: safeguard === 'Other' ? specifiedSafeguard || '' : undefined,
-        };
-      }
-      return item;
+  const handleSourceAssetChange = (assetId: string) => {
+    setFormData(prev => {
+      const currentSources = prev.dataSourceAssetIds || [];
+      const previousPrimary = currentSources[0] || '';
+      const remainingSources = currentSources.filter(id => id !== previousPrimary && id !== assetId);
+      const dataSourceAssetIds = assetId ? [assetId, ...remainingSources] : remainingSources;
+      const linkedAssetIds = new Set(prev.assetIds || []);
+      if (assetId) linkedAssetIds.add(assetId);
+      return {
+        ...prev,
+        dataSourceAssetIds,
+        assetIds: Array.from(linkedAssetIds),
+      };
     });
-
-    const newSafeguardSummary = Array.from(new Set(newDetails.map(d => d.safeguard).filter(Boolean))).join(', ');
-
-    setFormData(prev => ({
-      ...prev,
-      internationalTransferDetails: newDetails,
-      transferSafeguards: newSafeguardSummary || prev.transferSafeguards || 'None',
-    }));
   };
 
-  // Warning helper for International Transfers
-  const transferWarning = useMemo(() => {
-    return getInternationalTransferWarning(formData);
-  }, [formData]);
+  const handleDestinationAssetChange = (assetId: string) => {
+    setFormData(prev => {
+      const currentDestinations = prev.dataDestinationAssetIds || [];
+      const previousPrimary = currentDestinations[0] || '';
+      const remainingDestinations = currentDestinations.filter(id => id !== previousPrimary && id !== assetId);
+      const dataDestinationAssetIds = assetId ? [assetId, ...remainingDestinations] : remainingDestinations;
+      const linkedAssetIds = new Set(prev.assetIds || []);
+      if (assetId) linkedAssetIds.add(assetId);
+      return {
+        ...prev,
+        dataDestinationAssetIds,
+        assetIds: Array.from(linkedAssetIds),
+      };
+    });
+  };
+
+  const sourceAssetId = formData.dataSourceAssetIds?.[0] || '';
+  const sourceAsset = assets.find(asset => asset.id === sourceAssetId);
+  const sourceLocationPreview = sourceAsset?.primaryHostingLocation?.trim() || 'No primary hosting location recorded';
+  const destinationAssetId = formData.dataDestinationAssetIds?.[0] || '';
+  const destinationAsset = assets.find(asset => asset.id === destinationAssetId);
+  const destinationLocationPreview = destinationAsset?.primaryHostingLocation?.trim() || 'No primary hosting location recorded';
+  const storedSafeguard = (formData.transferSafeguards || '').trim();
+  const selectedSafeguardPreset =
+    storedSafeguard === 'Adequacy or equivalent' || storedSafeguard === 'SCCs'
+      ? storedSafeguard
+      : '';
+  const savedOtherSafeguard =
+    safeguardView === 'saved-text' && storedSafeguard && !selectedSafeguardPreset
+      ? storedSafeguard
+      : '';
+
+  const returnToSafeguardChoices = () => {
+    setSafeguardView('choices');
+    setOtherSafeguardDraft('');
+    setFormData(prev => ({ ...prev, transferSafeguards: '' }));
+  };
+
+  const selectTransferSafeguard = (value: 'Adequacy or equivalent' | 'SCCs') => {
+    setSafeguardView('choices');
+    setOtherSafeguardDraft('');
+    setFormData(prev => ({ ...prev, transferSafeguards: value }));
+  };
+
+  const saveOtherTransferSafeguard = () => {
+    const value = otherSafeguardDraft.trim();
+    if (!value) return;
+    setFormData(prev => ({ ...prev, transferSafeguards: value }));
+    setOtherSafeguardDraft('');
+    setSafeguardView('saved-text');
+  };
 
   // Role switch handler with warning confirmation
   const handleRoleChangeAttempt = (newRole: ProcessingRole) => {
@@ -669,37 +653,16 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
       });
     }
 
-    // Step 5: International Transfers
+    // Step 5: Data Flows
     if (formData.hasInternationalTransfer === 'Unknown') {
       warnings.push({
         id: 'warn-transfer-unknown',
         type: 'WARNING',
         step: 5,
-        stepName: 'International Transfers',
+        stepName: 'Data Flows',
         field: 'Transfer Status',
         message: 'International transfer status requires review',
         description: 'Investigate cross-border data flows and vendor hosting locations.',
-      });
-    } else if (formData.hasInternationalTransfer === 'Yes') {
-      const transferWarn = getInternationalTransferWarning(formData);
-      if (transferWarn) {
-        warnings.push({
-          id: 'warn-transfer-safeguard',
-          type: 'WARNING',
-          step: 5,
-          stepName: 'International Transfers',
-          field: 'Transfer Safeguards',
-          message: `${transferWarn.title}: ${transferWarn.description}`,
-          description: 'Ensure destination countries have valid transfer safeguard mechanisms.',
-        });
-      }
-      infos.push({
-        id: 'info-transfer-scc',
-        type: 'INFO',
-        step: 5,
-        stepName: 'International Transfers',
-        field: 'Cross-Border Governance',
-        message: 'Verify Standard Contractual Clauses (SCCs) are attached to sub-processor DPAs.',
       });
     }
 
@@ -1499,23 +1462,52 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
               <div className="border-b border-slate-200 pb-3">
                 <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
                   <Globe className="w-5 h-5 text-indigo-600" />
-                  Step 5: International Transfers & Safeguards
+                  Step 5: Data Flows
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Document cross-border data transfer status, regions, destination countries, and transfer safeguards (Art. 44-49 GDPR).
+                  Map the data flows in this processing activity, from source to destination, if applicable. Consider transfer safeguards and international transfers to third countries.
                 </p>
+              </div>
+
+              <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-4">
+                <Select
+                  label="What is the source asset/system?"
+                  options={[...assets]
+                    .sort((a, b) => a.name.localeCompare(b.name))
+                    .map(asset => ({ value: asset.id, label: `${asset.name} (${asset.id})` }))}
+                  value={sourceAssetId}
+                  onChange={event => handleSourceAssetChange(event.target.value)}
+                  placeholder="Select a source asset or system"
+                />
+                {sourceAsset && (
+                  <div className="max-w-2xl">
+                    <label
+                      htmlFor="source-location-preview"
+                      className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5"
+                    >
+                      Source Location
+                    </label>
+                    <input
+                      id="source-location-preview"
+                      value={sourceLocationPreview}
+                      readOnly
+                      tabIndex={-1}
+                      className="w-full rounded-md border border-slate-200 bg-slate-100 px-3 py-2 text-sm text-slate-500 cursor-default focus:outline-none"
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Primary Question */}
               <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
                 <label className="block text-xs font-bold text-slate-900">
-                  Are personal data transferred to third countries outside the origin jurisdiction?
+                  Is personal data transferred to another system as part of this processing activity?
                 </label>
                 <div className="flex flex-wrap items-center gap-3">
                   {[
-                    { value: 'No', label: 'No (Local/Domestic Only)' },
-                    { value: 'Yes', label: 'Yes (International Transfers Apply)' },
-                    { value: 'Unknown', label: 'Unknown (Under Assessment)' },
+                    { value: 'No', label: 'No - this asset only' },
+                    { value: 'Yes', label: 'Yes' },
+                    { value: 'Unknown', label: 'Not Sure/ Unknown' },
                   ].map(option => (
                     <label
                       key={option.value}
@@ -1557,174 +1549,126 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                 />
               )}
 
-              {/* Configuration when "Yes" */}
               {formData.hasInternationalTransfer === 'Yes' && (
-                <div className="space-y-6 animate-in fade-in duration-150">
-                  {/* Regions Selection */}
-                  <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800">
-                        1. Select Destination Regions
-                      </h4>
-                      <span className="text-[11px] font-semibold text-slate-500">
-                        {formData.selectedTransferRegions?.length || 0} regions selected
-                      </span>
-                    </div>
+                <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-4 animate-in fade-in duration-150">
+                  <Select
+                    label="What is the destination asset/system?"
+                    options={[...assets]
+                      .sort((a, b) => a.name.localeCompare(b.name))
+                      .map(asset => ({ value: asset.id, label: `${asset.name} (${asset.id})` }))}
+                    value={destinationAssetId}
+                    onChange={event => handleDestinationAssetChange(event.target.value)}
+                    placeholder="Select a destination asset or system"
+                  />
+                  {destinationAsset && (
+                    <>
+                      <div className="max-w-2xl">
+                        <label
+                          htmlFor="destination-location-preview"
+                          className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5"
+                        >
+                          Destination Location
+                        </label>
+                        <input
+                          id="destination-location-preview"
+                          value={destinationLocationPreview}
+                          readOnly
+                          tabIndex={-1}
+                          className="w-full rounded-md border border-slate-200 bg-slate-100 px-3 py-2 text-sm text-slate-500 cursor-default focus:outline-none"
+                        />
+                      </div>
 
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                      {transferRegionOptions.map(region => {
-                        const isChecked = formData.selectedTransferRegions?.includes(region);
-                        return (
+                      <div className="space-y-3 border-t border-slate-200 pt-4">
+                    <label className="block text-xs font-bold text-slate-900">
+                      What transfer safeguards are in place between the source and destination assets?
+                    </label>
+                    {safeguardView === 'other-draft' ? (
+                      <div className="relative max-w-xl">
+                        <input
+                          type="text"
+                          value={otherSafeguardDraft}
+                          onChange={event => setOtherSafeguardDraft(event.target.value)}
+                          onKeyDown={event => {
+                            if (event.key === 'Enter') {
+                              event.preventDefault();
+                              saveOtherTransferSafeguard();
+                            }
+                          }}
+                          placeholder="Describe the transfer safeguard"
+                          aria-label="Other transfer safeguard"
+                          className="w-full rounded-md border border-slate-300 bg-white py-2 pl-3 pr-10 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-800"
+                        />
+                        <button
+                          type="button"
+                          onClick={saveOtherTransferSafeguard}
+                          disabled={!otherSafeguardDraft.trim()}
+                          aria-label="Save transfer safeguard"
+                          className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-1 text-indigo-700 hover:bg-indigo-50 disabled:text-slate-300 disabled:hover:bg-transparent"
+                        >
+                          <Check className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ) : safeguardView === 'saved-text' && savedOtherSafeguard ? (
+                      <div className="inline-flex items-center gap-1 rounded-lg border border-indigo-300 bg-indigo-50 pl-3.5 pr-1 py-1">
+                        <button
+                          type="button"
+                          onClick={returnToSafeguardChoices}
+                          className="cursor-pointer text-left text-xs font-semibold text-indigo-950"
+                        >
+                          {savedOtherSafeguard}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={returnToSafeguardChoices}
+                          aria-label="Remove saved safeguard"
+                          className="cursor-pointer rounded p-1 text-indigo-700 hover:bg-indigo-100 hover:text-indigo-950"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap items-center gap-3">
+                        {(['Adequacy or equivalent', 'SCCs', 'Other'] as const).map(option => (
                           <label
-                            key={region}
-                            className={`flex items-start gap-2 p-2.5 rounded-lg border text-xs cursor-pointer transition ${
-                              isChecked
-                                ? 'bg-indigo-50 border-indigo-300 text-indigo-950 font-medium'
-                                : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100/70'
+                            key={option}
+                            className={`flex items-center gap-2 px-3.5 py-2 rounded-lg border text-xs font-semibold cursor-pointer transition ${
+                              option !== 'Other' && selectedSafeguardPreset === option
+                                ? 'bg-indigo-50 border-indigo-300 text-indigo-950 shadow-2xs'
+                                : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100/80'
                             }`}
                           >
                             <input
-                              type="checkbox"
-                              checked={Boolean(isChecked)}
-                              onChange={() => handleToggleTransferRegion(region)}
-                              className="mt-0.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                              type="radio"
+                              name="transferSafeguard"
+                              value={option}
+                              checked={option !== 'Other' && selectedSafeguardPreset === option}
+                              onClick={() => {
+                                if (option !== 'Other' && selectedSafeguardPreset === option) {
+                                  returnToSafeguardChoices();
+                                }
+                              }}
+                              onChange={() => {
+                                if (option === 'Other') {
+                                  setOtherSafeguardDraft('');
+                                  setSafeguardView('other-draft');
+                                  return;
+                                }
+                                if (selectedSafeguardPreset === option) {
+                                  returnToSafeguardChoices();
+                                  return;
+                                }
+                                selectTransferSafeguard(option);
+                              }}
+                              className="text-indigo-600 focus:ring-indigo-500"
                             />
-                            <span className="leading-tight">{region}</span>
+                            {option}
                           </label>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Destination Country → Region → Safeguard Matrix */}
-                  <div className="p-4 bg-white rounded-xl border border-slate-200 space-y-4">
-                    <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                      <div>
-                        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-900">
-                          2. Destination Countries & Transfer Safeguards
-                        </h4>
-                        <p className="text-[11px] text-slate-500">
-                          Specify each destination country and assign the applicable transfer mechanism (Adequacy, SCCs, or Other).
-                        </p>
-                      </div>
-                      <span className="text-xs font-mono font-bold px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-md border border-indigo-200">
-                        {formData.internationalTransferDetails?.length || 0} country records
-                      </span>
-                    </div>
-
-                    {/* Presets per selected region */}
-                    {(formData.selectedTransferRegions?.length || 0) > 0 && (
-                      <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-2">
-                        <span className="text-[11px] font-bold text-slate-600 block">
-                          Quick Add Common Destination Countries by Selected Region:
-                        </span>
-                        <div className="flex flex-wrap gap-1.5">
-                          {formData.selectedTransferRegions?.map(region => {
-                            const presetCountries = REGION_PRESET_COUNTRIES[region] || [];
-                            return presetCountries.map(country => {
-                              const alreadyAdded = formData.internationalTransferDetails?.some(
-                                d => d.country.toLowerCase() === country.toLowerCase()
-                              );
-                              return (
-                                <button
-                                  key={country}
-                                  type="button"
-                                  disabled={alreadyAdded}
-                                  onClick={() => handleAddDestinationCountry(region, country)}
-                                  className={`px-2.5 py-1 rounded text-xs transition flex items-center gap-1 ${
-                                    alreadyAdded
-                                      ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                                      : 'bg-white border border-slate-300 text-slate-700 hover:bg-indigo-50 hover:border-indigo-300 hover:text-indigo-900 shadow-2xs'
-                                  }`}
-                                >
-                                  <span>+ {country}</span>
-                                  <span className="text-[9px] text-slate-400 font-mono">({region.split(' ')[0]})</span>
-                                </button>
-                              );
-                            });
-                          })}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Destination Countries List */}
-                    {(!formData.internationalTransferDetails || formData.internationalTransferDetails.length === 0) ? (
-                      <div className="p-4 bg-amber-50/60 rounded-lg border border-dashed border-amber-300 text-center space-y-1">
-                        <p className="text-xs font-bold text-amber-900">No Destination Countries Added Yet</p>
-                        <p className="text-[11px] text-amber-700">
-                          Select regions above to quick-add destination countries and assign transfer safeguards.
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {formData.internationalTransferDetails.map(item => (
-                          <div
-                            key={item.id}
-                            className="p-3 bg-slate-50 rounded-lg border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-3"
-                          >
-                            <div className="space-y-0.5">
-                              <div className="flex items-center gap-2">
-                                <span className="font-bold text-slate-900 text-xs">{item.country}</span>
-                                <span className="text-[10px] font-medium px-2 py-0.5 bg-slate-200/80 text-slate-700 rounded-md">
-                                  {item.region}
-                                </span>
-                              </div>
-                              <div className="text-[10px] text-slate-500 flex items-center gap-1">
-                                <span>Hierarchy:</span>
-                                <span className="font-semibold text-slate-700">{item.country}</span>
-                                <span>→</span>
-                                <span className="font-semibold text-indigo-700">{item.region}</span>
-                                <span>→</span>
-                                <span className="font-semibold text-emerald-700">{item.safeguard}</span>
-                              </div>
-                            </div>
-
-                            <div className="flex items-center gap-2 grow max-w-md justify-end">
-                              <select
-                                value={item.safeguard}
-                                onChange={e => handleUpdateCountrySafeguard(item.id, e.target.value as any, item.specifiedSafeguard)}
-                                className="px-2.5 py-1.5 bg-white border border-slate-300 rounded-md text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                              >
-                                {transferSafeguardOptions.map(opt => (
-                                  <option key={opt} value={opt}>
-                                    {opt}
-                                  </option>
-                                ))}
-                              </select>
-
-                              {item.safeguard === 'Other' && (
-                                <input
-                                  type="text"
-                                  placeholder="Specify safeguard..."
-                                  value={item.specifiedSafeguard || ''}
-                                  onChange={e => handleUpdateCountrySafeguard(item.id, 'Other', e.target.value)}
-                                  className="px-2.5 py-1.5 bg-white border border-slate-300 rounded-md text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 grow"
-                                />
-                              )}
-
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveDestinationCountry(item.id)}
-                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition"
-                                title="Remove country"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </div>
                         ))}
                       </div>
                     )}
-
-                    {/* Transfer Safeguard Warning Banner */}
-                    {transferWarning && (
-                      <RiskWarningBanner
-                        title={transferWarning.title}
-                        description={transferWarning.description}
-                        severity={transferWarning.severity}
-                      />
-                    )}
-                  </div>
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
             </div>
