@@ -25,6 +25,8 @@ import { usePrivacyData } from '../../context/PrivacyDataContext';
 import { InventoryType, ProcessingActivity, TSPReference, Asset, Vendor, Entity, usesControllerWizardOptions } from '../../types/privacy';
 import { StatusBadge, ClassificationBadge, DpaStatusBadge, TagChip } from '../common/Badge';
 import { DataFlowDiagram } from '../common/DataFlowDiagram';
+import { ActivityTransferChart } from './ActivityTransferChart';
+import { destinationSafeguardLines, resolveTransferLinks } from '../../utils/destinationSafeguards';
 import { RiskWarningBanner } from '../common/RiskWarningBanner';
 import { getPersonalDataMetadata } from '../../data/personalDataCatalog';
 import { getInternationalTransferWarning } from '../../data/recipientAndTransferCatalog';
@@ -390,7 +392,17 @@ export const RecordDetailDrawer: React.FC<RecordDetailDrawerProps> = ({ onEditRe
                     <span className="text-[10px] font-semibold uppercase text-slate-400 tracking-wider block">
                       Transfer Safeguards
                     </span>
-                    <span className="font-medium text-slate-800">{record.transferSafeguards || 'None'}</span>
+                    {destinationSafeguardLines(record, assets).length === 0 ? (
+                      <span className="font-medium text-slate-800">None</span>
+                    ) : (
+                      <div className="space-y-1 mt-0.5">
+                        {destinationSafeguardLines(record, assets).map(line => (
+                          <span key={line.assetId || 'legacy'} className="font-medium text-slate-800 block">
+                            {line.assetName ? `${line.assetName}: ${line.safeguard || 'None'}` : (line.safeguard || 'None')}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -1002,7 +1014,15 @@ export const RecordDetailDrawer: React.FC<RecordDetailDrawerProps> = ({ onEditRe
           )}
 
           {activeTab === 'dataFlow' && type === 'processingActivities' && (
-            <DataFlowDiagram processingActivityId={id} />
+            <div className="space-y-6">
+              <ActivityTransferChart
+                assets={assets}
+                sourceAssetId={(record.dataSourceAssetIds || [])[0] || ''}
+                destinationAssetIds={record.dataDestinationAssetIds || []}
+                links={resolveTransferLinks(record)}
+              />
+              <DataFlowDiagram processingActivityId={id} />
+            </div>
           )}
         </div>
 

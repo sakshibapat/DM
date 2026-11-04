@@ -133,14 +133,6 @@ export const Header: React.FC<HeaderProps> = ({ onOpenCreateModal }) => {
         return 'Privacy Assessments';
       case 'ropa':
         return 'RoPA / Record of Processing Activities';
-      case 'future-risks':
-        return 'Risk Management Module';
-      case 'future-incidents':
-        return 'Privacy Incidents Module';
-      case 'future-dsars':
-        return 'Data Subject Requests (DSAR) Module';
-      case 'future-reports':
-        return 'Privacy Reporting & Governance';
       default:
         return 'Data Mapping Module';
     }

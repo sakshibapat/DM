@@ -6,6 +6,7 @@ import {
   ProcessingRole,
   Vendor,
 } from '../types/privacy';
+import { destinationSafeguardLines, isMeaningfulSafeguard } from './destinationSafeguards';
 
 export type RopaKind = 'controller' | 'processor';
 
@@ -81,7 +82,7 @@ const identityValue = (activity: ProcessingActivity, entities: Entity[]): string
 const purposeValue = (activity: ProcessingActivity): string =>
   join([activity.purpose, ...(activity.categoriesOfProcessing || [])]);
 
-const transferValue = (activity: ProcessingActivity): { text: string; missing: boolean } => {
+const transferValue = (activity: ProcessingActivity, assets: Asset[]): { text: string; missing: boolean } => {
   const status = activity.hasInternationalTransfer;
   const destinations = unique([
     ...(activity.internationalTransferDetails || []).map(detail =>
@@ -89,15 +90,22 @@ const transferValue = (activity: ProcessingActivity): { text: string; missing: b
     ),
     ...(activity.selectedTransferRegions || []),
   ]);
-  const safeguards = join([activity.transferSafeguards]);
+  const assetLines = destinationSafeguardLines(activity, assets);
+  const safeguards = join(
+    assetLines.map(line => (line.assetName ? `${line.assetName}: ${line.safeguard || 'None'}` : line.safeguard))
+  );
   if (!status) return { text: '', missing: true };
   if (status === 'No') return { text: 'No international transfer', missing: false };
   if (status === 'Unknown') return { text: 'Transfer status unknown', missing: true };
+  const assetDestinations = activity.dataDestinationAssetIds || [];
+  const missingSafeguard = assetDestinations.length
+    ? assetLines.some(line => !isMeaningfulSafeguard(line.safeguard))
+    : !isMeaningfulSafeguard(activity.transferSafeguards);
   const text = join([
     destinations.length ? `Destinations: ${destinations.join(', ')}` : '',
     safeguards ? `Safeguards: ${safeguards}` : '',
   ]);
-  return { text, missing: destinations.length === 0 || !safeguards };
+  return { text, missing: (assetDestinations.length === 0 && destinations.length === 0) || missingSafeguard };
 };
 
 const retentionValue = (activity: ProcessingActivity): { text: string; missing: boolean } => {
@@ -127,7 +135,7 @@ export const buildRopaRecord = (
     activity.specifiedThirdParty,
     activity.specifiedTrimbleProductTeam,
   ]);
-  const transfers = transferValue(activity);
+  const transfers = transferValue(activity, related.assets);
   const retention = retentionValue(activity);
   const security = securityValue(activity);
   const controllerOnBehalf = join([activity.processorAndControllerDetails, ...related.entities.map(entity => entity.name)]);

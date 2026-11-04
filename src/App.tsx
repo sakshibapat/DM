@@ -7,7 +7,6 @@ import { InventoryListView } from './components/inventory/InventoryListView';
 import { RecordDetailDrawer } from './components/inventory/RecordDetailDrawer';
 import { RecordFormModal } from './components/inventory/RecordFormModal';
 import { DataFlowsView } from './components/flows/DataFlowsView';
-import { FutureModulePlaceholder } from './components/future/FutureModulePlaceholder';
 import { InventoryManagerView } from './components/settings/InventoryManagerView';
 import { AssessmentsView } from './components/assessments/AssessmentsView';
 import { RopaView } from './components/ropa/RopaView';
@@ -82,10 +81,6 @@ const MainAppContent: React.FC = () => {
 
     if (activeNav === 'ropa') {
       return <RopaView />;
-    }
-
-    if (activeNav.startsWith('future-')) {
-      return <FutureModulePlaceholder moduleId={activeNav} />;
     }
 
     return <DashboardView onOpenCreateModal={handleOpenCreateModal} />;

@@ -122,6 +122,13 @@ export const TOMS_OPTIONS = [
 
 export type TOMOption = (typeof TOMS_OPTIONS)[number];
 
+export interface AssetTransferLink {
+  id: string;
+  fromAssetId: string;
+  toAssetId: string;
+  safeguard: string;
+}
+
 export interface ProcessingActivity extends BaseRecord {
   role: ProcessingRole;
   legalBasis: LegalBasis;
@@ -133,6 +140,8 @@ export interface ProcessingActivity extends BaseRecord {
   personalDataCategories: string[];
   involvesHighRiskData: boolean;
   transferSafeguards: string; // e.g., "EU Standard Contractual Clauses (SCCs)", "Data Privacy Framework (DPF)", "None"
+  transferSafeguardsByDestination?: Record<string, string>; // Destination asset id -> safeguard for that transfer
+  assetTransferLinks?: AssetTransferLink[]; // Directed transfers, including destination-to-destination
   toms: string[]; // Technical & Organizational Measures
   tomsOther?: string;
   tspStatus?: TSPStatusOption;
