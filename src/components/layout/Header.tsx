@@ -117,15 +117,15 @@ export const Header: React.FC<HeaderProps> = ({ onOpenCreateModal }) => {
       case 'dashboard':
         return 'Data Mapping Dashboard';
       case 'processingActivities':
-        return 'Data Mapping / Processing Activities Inventory';
+        return 'Processing Activities Inventory';
       case 'tspReferences':
-        return 'Data Mapping / TSP & Product References';
+        return 'TSP & Product References';
       case 'assets':
-        return 'Data Mapping / Systems & Assets Inventory';
+        return 'Systems & Assets Inventory';
       case 'vendors':
-        return 'Data Mapping / Vendors & Processors';
+        return 'Vendors & Processors';
       case 'entities':
-        return 'Data Mapping / Legal Entities Inventory';
+        return 'Legal Entities Inventory';
       case 'inventory-manager':
         return 'Administration / Inventory Manager';
       case 'privacyAssessments':
@@ -150,7 +150,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenCreateModal }) => {
             setImportSuccessMsg(true);
             setTimeout(() => setImportSuccessMsg(false), 3000);
           } else {
-            alert('Failed to parse JSON file. Ensure it is a valid PrivaMap export format.');
+            alert('Failed to parse JSON file. Ensure it is a valid Trimble Privacy Management Platform export format.');
           }
         }
       };
@@ -159,7 +159,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenCreateModal }) => {
   };
 
   return (
-    <header className="h-14 bg-white border-b border-slate-200 px-6 flex items-center justify-between shrink-0 sticky top-0 z-20 shadow-2xs">
+    <header className="h-[61.6px] bg-white border-b border-slate-200 px-6 flex items-center justify-between shrink-0 sticky top-0 z-20 shadow-2xs">
       {/* Title / Breadcrumb */}
       <div className="flex items-center gap-3">
         <h2 className="text-sm font-bold text-slate-800 tracking-tight">{getBreadcrumbTitle()}</h2>
@@ -433,7 +433,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenCreateModal }) => {
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          title="Import PrivaMap JSON file"
+          title="Import Trimble Privacy Management Platform JSON file"
           className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-slate-300 bg-white text-xs font-medium text-slate-700 hover:bg-slate-50 transition"
         >
           <Upload className="w-3.5 h-3.5 text-slate-500" />

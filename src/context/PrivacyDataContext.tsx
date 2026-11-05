@@ -939,7 +939,7 @@ export const PrivacyDataProvider: React.FC<{ children: React.ReactNode }> = ({ c
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `privamap-data-mapping-export-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `trimble-privacy-management-platform-data-mapping-export-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };

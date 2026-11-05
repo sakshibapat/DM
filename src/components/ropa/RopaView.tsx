@@ -70,7 +70,7 @@ export const RopaView: React.FC = () => {
     const sheet = XLSX.utils.json_to_sheet(ropaExportRows(filtered));
     const book = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(book, sheet, 'RoPA');
-    XLSX.writeFile(book, `privamap-ropa.${format}`, { bookType: format === 'csv' ? 'csv' : 'xlsx' });
+    XLSX.writeFile(book, `trimble-privacy-management-platform-ropa.${format}`, { bookType: format === 'csv' ? 'csv' : 'xlsx' });
   };
 
   const openActivity = (id: string) => {
