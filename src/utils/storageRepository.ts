@@ -136,7 +136,9 @@ export const loadDataStore = (): DataStore => {
         Array.isArray(parsed.vendors)
       ) {
         return {
-          processingActivities: parsed.processingActivities,
+          processingActivities: parsed.processingActivities.map((activity: ProcessingActivity) =>
+            activity?.status === 'Approved' ? { ...activity, status: 'Published' as const } : activity
+          ),
           tspReferences: parsed.tspReferences || [],
           assets: parsed.assets,
           vendors: parsed.vendors,

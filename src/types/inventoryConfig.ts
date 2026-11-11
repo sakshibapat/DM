@@ -75,6 +75,7 @@ const group = (
 });
 
 const STATUSES = ['Approved', 'Under Review', 'Draft', 'Archived'];
+const PROCESSING_ACTIVITY_STATUSES = ['Published', 'Under Review', 'Draft', 'Archived'];
 const TSP_STATUSES = ['Yes', 'No', 'Pending', 'N/A'];
 
 export const DEFAULT_INVENTORY_CONFIG: InventoryConfigDocument = {
@@ -83,7 +84,7 @@ export const DEFAULT_INVENTORY_CONFIG: InventoryConfigDocument = {
     processingActivities: {
       displayName: 'Processing Activities',
       optionGroups: {
-        statuses: group('statuses', 'Approval Statuses', 'Record lifecycle statuses.', STATUSES),
+        statuses: group('statuses', 'Approval Statuses', 'Record lifecycle statuses.', PROCESSING_ACTIVITY_STATUSES),
         roles: group('roles', 'Processing Roles', 'Controller and processor classifications.', [
           'Controller',
           'Processor (B2B sales only)',
@@ -206,6 +207,17 @@ export const mergeInventoryConfig = (saved?: Partial<InventoryConfigDocument> | 
       }
     });
   });
+
+  const activityStatuses = merged.inventories.processingActivities.optionGroups.statuses;
+  if (activityStatuses?.options) {
+    const hasPublished = activityStatuses.options.some(option => option.value === 'Published');
+    activityStatuses.options = activityStatuses.options.flatMap(option => {
+      if (option.value !== 'Approved') return [option];
+      if (hasPublished) return [];
+      return [{ ...option, value: 'Published', label: 'Published' }];
+    });
+  }
+
   return merged;
 };
 

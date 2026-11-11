@@ -2,7 +2,7 @@
  * Core Data Mapping & Privacy Platform Types
  */
 
-export type StatusType = 'Draft' | 'Under Review' | 'Approved' | 'Archived';
+export type StatusType = 'Draft' | 'Under Review' | 'Published' | 'Approved' | 'Archived';
 
 export type InventoryType = 'processingActivities' | 'tspReferences' | 'assets' | 'vendors' | 'entities';
 

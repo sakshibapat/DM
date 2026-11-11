@@ -12,7 +12,7 @@ export const StatusBadge: React.FC<{ status: StatusType; size?: 'sm' | 'md' }> =
   let style = 'bg-slate-100 text-slate-700 border-slate-200';
   let dotColor = 'bg-slate-400';
 
-  if (status === 'Approved') {
+  if (status === 'Published' || status === 'Approved') {
     style = 'bg-emerald-50 text-emerald-700 border-emerald-200/80';
     dotColor = 'bg-emerald-500';
   } else if (status === 'Under Review') {

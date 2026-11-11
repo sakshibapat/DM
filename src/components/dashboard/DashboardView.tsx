@@ -50,7 +50,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenCreateModal 
     onOpenCreateModal(type);
   };
 
-  const approvedActivities = processingActivities.filter(activity => activity.status === 'Approved').length;
+  const publishedActivities = processingActivities.filter(
+    activity => activity.status === 'Published' || activity.status === 'Approved'
+  ).length;
   const reviewActivities = processingActivities.filter(activity => activity.status === 'Under Review').length;
   const draftActivities = processingActivities.filter(activity => activity.status === 'Draft').length;
   const sensitiveAssets = assets.filter(
@@ -67,7 +69,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenCreateModal 
   const activitiesWithRetention = metrics.totalProcessingActivities - metrics.recordsMissingRetention;
   const standardRiskActivities = metrics.totalProcessingActivities - metrics.recordsHighRisk;
   const activityPreview = [
-    `${approvedActivities} approved`,
+    `${publishedActivities} published`,
     `${reviewActivities} in review`,
     draftActivities > 0 ? `${draftActivities} draft` : '',
   ].filter(Boolean).join(' · ');
