@@ -30,6 +30,8 @@ export interface SecurityMeasuresSectionProps {
   onTspRecordIdsChange?: (ids: string[]) => void;
   /** Set to false to hide the "Record Scope Notice" under the TOMs section */
   showScopeNotice?: boolean;
+  /** Set to false to hide the "TSP Registration Pending" notice */
+  showPendingNotice?: boolean;
 }
 
 export const SecurityMeasuresSection: React.FC<SecurityMeasuresSectionProps> = ({
@@ -49,6 +51,7 @@ export const SecurityMeasuresSection: React.FC<SecurityMeasuresSectionProps> = (
   selectedTspRecordIds = [],
   onTspRecordIdsChange,
   showScopeNotice = true,
+  showPendingNotice = true,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [tspSearchTerm, setTspSearchTerm] = useState('');
@@ -114,7 +117,7 @@ export const SecurityMeasuresSection: React.FC<SecurityMeasuresSectionProps> = (
       <div className="bg-slate-50 p-4.5 rounded-xl border border-slate-200 space-y-4">
         <div className="flex items-center justify-between border-b border-slate-200 pb-2.5">
           <div>
-            <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+            <h4 className="text-xs font-bold text-slate-900 flex items-center gap-2">
               <ShieldCheck className="w-4 h-4 text-indigo-600" />
               TSP Registration Status
             </h4>
@@ -125,7 +128,7 @@ export const SecurityMeasuresSection: React.FC<SecurityMeasuresSectionProps> = (
         </div>
 
         <div className="space-y-3">
-          <label className="text-xs font-semibold text-slate-700 block">
+          <label className="text-xs font-bold text-slate-700 block">
             Is the product registered in the TSP? <span className="text-rose-600">*</span>
           </label>
 
@@ -136,13 +139,13 @@ export const SecurityMeasuresSection: React.FC<SecurityMeasuresSectionProps> = (
               let activeColorClasses = 'border-slate-200 bg-white hover:border-slate-300 text-slate-700';
               if (isSelected) {
                 if (option === 'Yes') {
-                  activeColorClasses = 'border-emerald-500 bg-emerald-50 text-emerald-900 ring-2 ring-emerald-500/20 font-bold';
+                  activeColorClasses = 'border-emerald-500 bg-emerald-50 text-emerald-900 ring-2 ring-emerald-500/20 font-normal';
                 } else if (option === 'Pending') {
-                  activeColorClasses = 'border-amber-500 bg-amber-50 text-amber-900 ring-2 ring-amber-500/20 font-bold';
+                  activeColorClasses = 'border-amber-500 bg-amber-50 text-amber-900 ring-2 ring-amber-500/20 font-normal';
                 } else if (option === 'N/A') {
-                  activeColorClasses = 'border-purple-500 bg-purple-50 text-purple-900 ring-2 ring-purple-500/20 font-bold';
+                  activeColorClasses = 'border-purple-500 bg-purple-50 text-purple-900 ring-2 ring-purple-500/20 font-normal';
                 } else {
-                  activeColorClasses = 'border-slate-400 bg-slate-100 text-slate-900 ring-2 ring-slate-400/20 font-bold';
+                  activeColorClasses = 'border-slate-400 bg-slate-100 text-slate-900 ring-2 ring-slate-400/20 font-normal';
                 }
               }
 
@@ -176,13 +179,13 @@ export const SecurityMeasuresSection: React.FC<SecurityMeasuresSectionProps> = (
           </div>
 
           {/* Pending Status Badge */}
-          {tspStatus === 'Pending' && (
+          {showPendingNotice && tspStatus === 'Pending' && (
             <div className="p-3 bg-amber-50 border border-amber-300 text-amber-900 rounded-lg text-xs flex items-center justify-between animate-in fade-in duration-150">
               <div className="flex items-center gap-2">
                 <Clock className="w-4 h-4 text-amber-700 shrink-0" />
-                <span className="font-bold text-amber-950">TSP Registration Status:</span>
+                <span className="font-normal text-amber-950">TSP Registration Status:</span>
               </div>
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-200/80 text-amber-950 border border-amber-400 text-[11px] font-bold uppercase tracking-wide">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-200/80 text-amber-950 border border-amber-400 text-[11px] font-normal">
                 <Clock className="w-3.5 h-3.5 text-amber-800" />
                 TSP Registration Pending
               </span>
@@ -192,7 +195,7 @@ export const SecurityMeasuresSection: React.FC<SecurityMeasuresSectionProps> = (
           {/* N/A Required Justification Text Field */}
           {tspStatus === 'N/A' && (
             <div className="space-y-1.5 pt-1 animate-in fade-in duration-150">
-              <label className="text-xs font-semibold text-slate-700 block">
+              <label className="text-xs font-bold text-slate-700 block">
                 Please provide justification. <span className="text-rose-600">*</span>
               </label>
               <textarea
@@ -201,7 +204,7 @@ export const SecurityMeasuresSection: React.FC<SecurityMeasuresSectionProps> = (
                 value={tspJustification}
                 onChange={e => onTspJustificationChange(e.target.value)}
                 placeholder="Explain why TSP registration is not applicable to this product or activity..."
-                className={`w-full px-3 py-2 rounded-lg border text-xs text-slate-900 outline-none transition ${
+                className={`w-full px-3 py-2 rounded-lg border text-sm text-slate-900 outline-none transition ${
                   !tspJustification.trim()
                     ? 'border-rose-300 bg-rose-50/40 focus:ring-2 focus:ring-rose-400'
                     : 'border-slate-300 bg-white focus:ring-2 focus:ring-indigo-500'
@@ -220,7 +223,7 @@ export const SecurityMeasuresSection: React.FC<SecurityMeasuresSectionProps> = (
           {tspStatus === 'Yes' && tspRecords && onTspRecordIdsChange && (
             <div className="space-y-2 pt-1 animate-in fade-in duration-150">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-semibold text-slate-700">
+                <label className="text-xs font-bold text-slate-700">
                   Attach TSP inventory records
                 </label>
                 <span className="text-[11px] text-slate-500">
@@ -235,9 +238,9 @@ export const SecurityMeasuresSection: React.FC<SecurityMeasuresSectionProps> = (
                     return (
                       <span
                         key={id}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-white border border-emerald-200 text-xs font-medium text-slate-800"
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-white border border-emerald-200 text-xs font-normal text-slate-800"
                       >
-                        <span className="font-mono text-[11px] font-semibold text-slate-500">{id}</span>
+                        <span className="font-mono text-[11px] font-normal text-slate-500">{id}</span>
                         <span className="max-w-[180px] truncate">{record?.name || 'Unknown record'}</span>
                         {!readOnly && (
                           <button
@@ -264,7 +267,7 @@ export const SecurityMeasuresSection: React.FC<SecurityMeasuresSectionProps> = (
                   value={tspSearchTerm}
                   onChange={e => setTspSearchTerm(e.target.value)}
                   placeholder={`Search ${(tspRecords || []).length} TSP inventory records by ID, name, or status...`}
-                  className="w-full pl-8 pr-3 py-2 rounded-lg border border-slate-300 bg-white text-xs text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
+                  className="w-full pl-8 pr-3 py-2 rounded-lg border border-slate-300 bg-white text-sm text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
                 />
               </div>
 
@@ -281,16 +284,16 @@ export const SecurityMeasuresSection: React.FC<SecurityMeasuresSectionProps> = (
                         disabled={readOnly}
                         onClick={() => toggleTspRecord(record.id)}
                         className={`w-full text-left px-2.5 py-2 flex items-center justify-between gap-2 text-xs transition ${
-                          isSelected ? 'bg-emerald-50/70 text-emerald-950 font-medium' : 'hover:bg-slate-50 text-slate-700'
+                          isSelected ? 'bg-emerald-50/70 text-emerald-950 font-normal' : 'hover:bg-slate-50 text-slate-700'
                         }`}
                       >
                         <span className="flex items-center gap-2 min-w-0">
-                          <span className="font-mono text-[11px] text-slate-500 font-semibold shrink-0">{record.id}</span>
+                          <span className="font-mono text-[11px] text-slate-500 font-normal shrink-0">{record.id}</span>
                           <span className="truncate">{record.name}</span>
                         </span>
                         <span className="flex items-center gap-2 shrink-0">
                           {record.status && (
-                            <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 bg-slate-100 rounded text-slate-500">
+                            <span className="text-[11px] font-mono px-1.5 py-0.5 bg-slate-100 rounded text-slate-500">
                               {record.status}
                             </span>
                           )}
@@ -316,7 +319,7 @@ export const SecurityMeasuresSection: React.FC<SecurityMeasuresSectionProps> = (
       <div className="bg-slate-50 p-4.5 rounded-xl border border-slate-200 space-y-4">
         <div className="flex items-center justify-between border-b border-slate-200 pb-2.5">
           <div>
-            <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+            <h4 className="text-xs font-bold text-slate-900 flex items-center gap-2">
               <Lock className="w-4 h-4 text-indigo-600" />
               Technical & Organisational Security Measures (TOMs)
             </h4>
@@ -324,7 +327,7 @@ export const SecurityMeasuresSection: React.FC<SecurityMeasuresSectionProps> = (
               Select all security controls, access safeguards, and technical policies implemented for this record.
             </p>
           </div>
-          <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-slate-200 text-slate-700">
+          <span className="text-xs font-mono font-normal px-2 py-0.5 rounded bg-slate-200 text-slate-700">
             {toms.length} selected
           </span>
         </div>
@@ -338,7 +341,7 @@ export const SecurityMeasuresSection: React.FC<SecurityMeasuresSectionProps> = (
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
               placeholder="Search security controls (e.g., Encryption, SSO, Logging)..."
-              className="w-full pl-9 pr-3 py-1.5 rounded-lg border border-slate-300 bg-white text-xs text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
+              className="w-full pl-9 pr-3 py-1.5 rounded-lg border border-slate-300 bg-white text-sm text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
             />
             {searchTerm && (
               <button
@@ -355,7 +358,7 @@ export const SecurityMeasuresSection: React.FC<SecurityMeasuresSectionProps> = (
             <button
               type="button"
               onClick={handleClearAll}
-              className="px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 font-semibold text-xs transition shrink-0"
+              className="px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 font-normal text-xs transition shrink-0"
             >
               Clear selection
             </button>
@@ -365,14 +368,14 @@ export const SecurityMeasuresSection: React.FC<SecurityMeasuresSectionProps> = (
         {/* Selected Chips / Tags Container */}
         {toms.length > 0 && (
           <div className="p-3 bg-white rounded-lg border border-slate-200 space-y-2">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+            <span className="text-[11px] font-normal text-slate-400 block">
               Active Controls ({toms.length})
             </span>
             <div className="flex flex-wrap gap-1.5">
               {toms.map(opt => (
                 <span
                   key={opt}
-                  className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-md bg-indigo-50 text-indigo-900 border border-indigo-200"
+                  className="inline-flex items-center gap-1.5 text-xs font-normal px-2.5 py-1 rounded-md bg-indigo-50 text-indigo-900 border border-indigo-200"
                 >
                   <span>{opt}</span>
                   {opt === 'Other' && tomsOther && (
@@ -408,7 +411,7 @@ export const SecurityMeasuresSection: React.FC<SecurityMeasuresSectionProps> = (
                   key={option}
                   className={`p-2.5 rounded-lg border text-xs cursor-pointer transition flex items-center justify-between ${
                     checked
-                      ? 'bg-indigo-50/70 border-indigo-300 text-indigo-950 font-semibold'
+                      ? 'bg-indigo-50/70 border-indigo-300 text-indigo-950 font-normal'
                       : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-100/50'
                   }`}
                 >
@@ -432,7 +435,7 @@ export const SecurityMeasuresSection: React.FC<SecurityMeasuresSectionProps> = (
         {/* Conditional "Other" Text Field */}
         {isOtherSelected && (
           <div className="space-y-1.5 pt-2 border-t border-slate-200 animate-in fade-in duration-150">
-            <label className="text-xs font-semibold text-slate-700 block">
+            <label className="text-xs font-bold text-slate-700 block">
               Please describe the additional control <span className="text-rose-600">*</span>
             </label>
             <input
@@ -441,7 +444,7 @@ export const SecurityMeasuresSection: React.FC<SecurityMeasuresSectionProps> = (
               value={tomsOther}
               onChange={e => onTomsOtherChange(e.target.value)}
               placeholder="Provide details of custom or proprietary security measures..."
-              className="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white text-xs text-slate-900 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
+              className="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white text-sm text-slate-900 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
             />
             {!tomsOther.trim() && (
               <p className="text-[11px] text-amber-600 flex items-center gap-1">
@@ -457,7 +460,7 @@ export const SecurityMeasuresSection: React.FC<SecurityMeasuresSectionProps> = (
           <div className="p-3 rounded-lg bg-blue-50/60 border border-blue-200 text-[11px] text-blue-900 flex items-start gap-2">
             <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
             <span>
-              <strong>Record Scope Notice:</strong> Security controls selected here are recorded specifically for this item. Linked Assets or Vendors maintain distinct security profiles.
+              <span>Record Scope Notice:</span> Security controls selected here are recorded specifically for this item. Linked Assets or Vendors maintain distinct security profiles.
             </span>
           </div>
         )}

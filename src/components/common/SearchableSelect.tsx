@@ -69,7 +69,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
       {label && (
         <label
           htmlFor={inputId}
-          className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5"
+          className={`block text-xs text-slate-700 mb-1.5 font-bold`}
         >
           {label}
         </label>
@@ -141,7 +141,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
                     onClick={() => choose(option.value)}
                     className={`w-full text-left px-3 py-1.5 text-sm transition ${
                       option.value === value
-                        ? 'bg-slate-100 font-semibold text-slate-900'
+                        ? 'bg-slate-100 font-normal text-slate-900'
                         : 'text-slate-700 hover:bg-slate-50'
                     }`}
                   >

@@ -29,7 +29,7 @@ export const TextField: React.FC<TextFieldProps> = ({
   return (
     <div className="w-full">
       {label && (
-        <label htmlFor={inputId} className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5">
+        <label htmlFor={inputId} className={`block text-xs text-slate-700 mb-1.5 font-bold`}>
           {label}
         </label>
       )}
@@ -57,7 +57,7 @@ export const TextField: React.FC<TextFieldProps> = ({
           ) : null}
         </>
       )}
-      {error && <p className="mt-1 text-xs text-rose-600 font-medium">{error}</p>}
+      {error && <p className="mt-1 text-xs text-rose-600 font-normal">{error}</p>}
       {helperText && !error && <p className="mt-1 text-xs text-slate-500">{helperText}</p>}
     </div>
   );

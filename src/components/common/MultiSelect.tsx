@@ -44,7 +44,7 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
   return (
     <div className="w-full">
       {label && (
-        <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5">
+        <label className={`block text-xs text-slate-700 mb-1.5 font-bold`}>
           {label}
         </label>
       )}
@@ -68,7 +68,7 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
 
       {unusedPresets.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-1 items-center">
-          <span className="text-xs text-slate-500 mr-1 font-medium">Suggestions:</span>
+          <span className="text-xs text-slate-500 mr-1 font-normal">Suggestions:</span>
           {unusedPresets.slice(0, 6).map(preset => (
             <button
               key={preset}

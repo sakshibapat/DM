@@ -57,12 +57,10 @@ import {
 } from '../../types/privacy';
 import { TextField } from '../common/TextField';
 import { Select } from '../common/Select';
-import { MultiSelect } from '../common/MultiSelect';
 import { SearchableRelationshipSelector } from '../common/SearchableRelationshipSelector';
 import { SearchableSelect } from '../common/SearchableSelect';
 import { DataSubjectPersonalDataCard } from './DataSubjectPersonalDataCard';
 import { OtherRecipientEntries } from './OtherRecipientEntries';
-import { RiskWarningBanner } from '../common/RiskWarningBanner';
 import {
   DATA_SUBJECT_CATEGORIES,
   CONTROLLED_PERSONAL_DATA_ITEMS,
@@ -185,11 +183,6 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
 
   const roleOptions = getConfiguredOptions('processingActivities', 'roles', isEdit ? [formData.role || ''] : []);
   const controllerPurposeOptions = getConfiguredOptions('processingActivities', 'controllerPurposes', isEdit ? [formData.purpose || ''] : []);
-  const processorCategoryOptions = getConfiguredOptions(
-    'processingActivities',
-    'processorCategories',
-    isEdit ? (formData.categoriesOfProcessing as string[] || []) : []
-  );
   const legalBasisOptions = getConfiguredOptions('processingActivities', 'legalBases', isEdit ? [formData.legalBasis || ''] : []);
   const dataSubjectCategoryOptions = getConfiguredOptions(
     'processingActivities',
@@ -212,7 +205,9 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
     isEdit ? (formData.recipientCategories || []).filter(value => RECIPIENT_CATEGORIES_EXTERNAL.includes(value as any)) : []
   );
   const configuredToms = getConfiguredOptions('processingActivities', 'toms', isEdit ? formData.toms || [] : []);
-  const configuredTspStatuses = getConfiguredOptions('processingActivities', 'tspStatuses', isEdit ? [formData.tspStatus || ''] : []);
+  // "Pending" is not offered as a TSP status choice in the processing activity wizard
+  const configuredTspStatuses = getConfiguredOptions('processingActivities', 'tspStatuses', isEdit ? [formData.tspStatus || ''] : [])
+    .filter(status => status !== 'Pending');
   const statusBeforeArchive = useRef<StatusType | ''>('');
 
   const setArchived = (archived: boolean) => {
@@ -685,7 +680,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
 
     const hasControllerSpecificData = Boolean(formData.purpose || formData.controllerContactDetails);
     const hasProcessorSpecificData = Boolean(
-      (formData.categoriesOfProcessing && formData.categoriesOfProcessing.length > 0) ||
+      (formData.categoriesOfProcessing && formData.categoriesOfProcessing.length > 0) || Boolean(formData.purpose) ||
         formData.processorAndControllerDetails
     );
 
@@ -707,6 +702,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
         updated.purpose = '';
         updated.controllerContactDetails = '';
       } else if (usesControllerWizardOptions(newRole) && usesProcessorWizardOptions(prev.role)) {
+        updated.purpose = '';
         updated.categoriesOfProcessing = [];
         updated.processorAndControllerDetails = '';
       }
@@ -785,15 +781,15 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
         });
       }
     } else if (usesProcessorWizardOptions(formData.role)) {
-      if (!formData.categoriesOfProcessing || formData.categoriesOfProcessing.length === 0) {
+      if (!formData.purpose || !formData.purpose.trim()) {
         errors.push({
-          id: 'err-cat-proc',
+          id: 'err-purpose-proc',
           type: 'ERROR',
           step: 2,
           stepName: 'Role',
-          field: 'Categories of Processing',
-          message: 'Categories of Processing required for Processor role',
-          description: 'Select applicable categories of processing performed on behalf of controllers.',
+          field: 'Purpose for Processing',
+          message: 'Purpose for Processing is required',
+          description: 'Select the primary purpose of processing performed on behalf of controllers.',
         });
       }
     }
@@ -938,18 +934,6 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
       });
     }
 
-    if (formData.tspStatus === 'Pending') {
-      warnings.push({
-        id: 'warn-tsp-pending',
-        type: 'WARNING',
-        step: 7,
-        stepName: 'Security Measures',
-        field: 'TSP Registration Status',
-        message: 'TSP Registration is pending confirmation',
-        description: 'Follow up with technical teams to confirm TSP catalog registration.',
-      });
-    }
-
     if (!formData.toms || formData.toms.length === 0) {
       warnings.push({
         id: 'warn-toms',
@@ -994,7 +978,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
     if (formData.description?.trim()) score += 15;
     if (formData.owner?.trim()) score += 10;
     if (formData.role) score += 10;
-    if (usesControllerWizardOptions(formData.role) ? formData.purpose : formData.categoriesOfProcessing?.length) score += 10;
+    if (formData.purpose) score += 10;
     if (formData.dataSubjectCategories?.length) score += 15;
     if (formData.retentionPolicyType === 'Custom' && formData.retentionPeriod?.trim() && formData.retentionPeriod !== 'None') score += 15;
     if (
@@ -1086,7 +1070,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                 </h2>
                 {formData.status && (
                   <span
-                    className={`shrink-0 inline-flex items-center rounded px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide border select-none pointer-events-none ${
+                    className={`shrink-0 inline-flex items-center rounded px-2 py-0.5 text-[11px] font-normal border select-none pointer-events-none ${
                       formData.status === 'Published' || formData.status === 'Approved'
                         ? 'bg-emerald-500/15 text-emerald-300 border-emerald-400/30'
                         : formData.status === 'Under Review'
@@ -1108,8 +1092,8 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
             {/* Completion Percentage Bar */}
             <div className="flex items-center gap-2.5 bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700">
               <div className="text-right">
-                <div className="text-[10px] uppercase font-bold text-slate-400">Completion</div>
-                <div className="text-xs font-mono font-bold text-indigo-400">{percentage}%</div>
+                <div className="text-[11px] font-normal text-slate-400">Completion</div>
+                <div className="text-xs font-mono font-normal text-indigo-400">{percentage}%</div>
               </div>
               <div className="w-16 bg-slate-700 rounded-full h-2 overflow-hidden">
                 <div
@@ -1133,7 +1117,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
         </div>
 
         {/* STEP-BASED NAVIGATION HEADER */}
-        <div className="bg-slate-50 border-b border-slate-200 px-4 py-2 flex items-center gap-1 overflow-x-auto shrink-0 scrollbar-none">
+        <div className="bg-slate-50 border-b border-slate-200 px-4 py-2 flex items-stretch gap-1 shrink-0">
           {FORM_STEPS.map(step => {
             const StepIcon = step.icon;
             const isActive = currentStep === step.id;
@@ -1144,16 +1128,16 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                 key={step.id}
                 type="button"
                 onClick={() => setCurrentStep(step.id)}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition shrink-0 whitespace-nowrap ${
+                className={`flex flex-1 min-w-0 items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-bold leading-tight text-left transition ${
                   isActive
-                    ? 'bg-indigo-600 text-white shadow-2xs font-semibold'
+                    ? 'bg-indigo-600 text-white shadow-2xs font-bold'
                     : isCompleted
                     ? 'bg-white text-slate-700 hover:bg-slate-200/60 border border-slate-200'
                     : 'text-slate-500 hover:bg-slate-200/50'
                 }`}
               >
                 <div
-                  className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                  className={`w-4 h-4 rounded-full flex items-center justify-center text-[11px] font-normal shrink-0 ${
                     isActive
                       ? 'bg-white text-indigo-700'
                       : isCompleted
@@ -1161,9 +1145,9 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                       : 'bg-slate-200 text-slate-600'
                   }`}
                 >
-                  {isCompleted ? <Check className="w-3 h-3" /> : step.id}
+                  {step.id}
                 </div>
-                <span>{step.name}</span>
+                <span className="min-w-0 break-words">{step.name}</span>
               </button>
             );
           })}
@@ -1221,7 +1205,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                   className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 mt-0.5"
                 />
                 <span>
-                  <span className="block text-xs font-semibold text-slate-800">Archive this record</span>
+                  <span className="block text-xs font-normal text-slate-800">Archive this record</span>
                   <span className="block text-[11px] text-slate-500">Sets the activity status to Archived.</span>
                 </span>
               </label>
@@ -1240,7 +1224,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
 
               {/* ROLE SELECTION QUESTION */}
               <div className="bg-slate-50 p-5 rounded-xl border border-slate-200 space-y-3">
-                <label className="block text-xs font-bold text-slate-900 uppercase tracking-wider">
+                <label className="block text-xs font-bold text-slate-900">
                   Question: Are you acting as a Controller or Processor for this activity? *
                 </label>
 
@@ -1261,7 +1245,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                       >
                         <div>
                           <div className="flex items-center justify-between mb-1">
-                            <span className="font-bold text-xs text-slate-900">{roleValue}</span>
+                            <span className="font-normal text-xs text-slate-900">{roleValue}</span>
                             <div
                               className={`w-4 h-4 rounded-full border flex items-center justify-center ${
                                 isSelected ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-slate-300'
@@ -1281,10 +1265,10 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
               {usesControllerWizardOptions(formData.role) && (
                 <div className="bg-indigo-50/40 p-5 rounded-xl border border-indigo-200/70 space-y-4 animate-in fade-in duration-200">
                   <div className="flex items-center gap-2 border-b border-indigo-100 pb-2">
-                    <span className="text-xs font-bold uppercase tracking-wider text-indigo-900">
+                    <span className="text-xs font-normal text-indigo-900">
                       Controller-Specific Requirements
                     </span>
-                    <span className="text-[10px] font-semibold bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded">
+                    <span className="text-[11px] font-normal bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded">
                       Art. 30(1) GDPR
                     </span>
                   </div>
@@ -1328,24 +1312,26 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
               {usesProcessorWizardOptions(formData.role) && (
                 <div className="bg-emerald-50/40 p-5 rounded-xl border border-emerald-200/70 space-y-4 animate-in fade-in duration-200">
                   <div className="flex items-center gap-2 border-b border-emerald-100 pb-2">
-                    <span className="text-xs font-bold uppercase tracking-wider text-emerald-900">
+                    <span className="text-xs font-normal text-emerald-900">
                       Processor-Specific Requirements
                     </span>
-                    <span className="text-[10px] font-semibold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded">
+                    <span className="text-[11px] font-normal bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded">
                       Art. 30(2) GDPR
                     </span>
                   </div>
 
-                  {/* Categories of Processing (Multi Select) */}
+                  {/* Purpose for Processing (Single Select, same options as Controller) */}
                   <div>
-                    <MultiSelect
-                      label="Categories of Processing *"
-                      selectedValues={(formData.categoriesOfProcessing as string[]) || []}
-                      onChange={vals => setFormData({ ...formData, categoriesOfProcessing: vals })}
-                      presetOptions={processorCategoryOptions}
+                    <Select
+                      label="Purpose for Processing *"
+                      options={controllerPurposeOptions}
+                      value={formData.purpose || ''}
+                      onChange={e => setFormData({ ...formData, purpose: e.target.value })}
+                      placeholder="-- Select Primary Purpose of Processing --"
+                      error={!formData.purpose ? 'Purpose selection is required' : undefined}
                     />
                     <p className="text-[11px] text-slate-500 mt-1">
-                      Select all categories of processing operations performed on behalf of your controllers.
+                      Select the primary business purpose defining why personal data is collected and processed.
                     </p>
                   </div>
 
@@ -1373,7 +1359,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
               <div className="bg-slate-50 p-4.5 rounded-xl border border-slate-200 space-y-4">
                 <div className="flex items-center justify-between border-b border-slate-200 pb-2.5">
                   <div>
-                    <h4 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                    <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
                       <Shield className="w-4 h-4 text-indigo-600" />
                       Legal Basis for Processing
                     </h4>
@@ -1410,7 +1396,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                             className="w-4 h-4 rounded border-amber-400 text-amber-600 focus:ring-amber-500 mt-0.5"
                           />
                           <div>
-                            <span className="font-bold text-xs text-amber-950 block">
+                            <span className="font-normal text-xs text-amber-950 block">
                               A LIA has been filed for this processing activity.
                             </span>
                             <span className="text-[11px] text-amber-800 block mt-0.5">
@@ -1420,10 +1406,10 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                         </label>
 
                         {!formData.liaFiled && (
-                          <div className="flex items-start gap-2 text-xs text-amber-900 bg-amber-100/70 p-2.5 rounded border border-amber-300 font-medium">
+                          <div className="flex items-start gap-2 text-xs text-amber-900 bg-amber-100/70 p-2.5 rounded border border-amber-300 font-normal">
                             <AlertCircle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
                             <span>
-                              <strong>Warning:</strong> Legitimate Interest selected but LIA has not been confirmed. Draft saves are allowed, but LIA confirmation is required for final privacy approval.
+                              <span>Warning:</span> Legitimate Interest selected but LIA has not been confirmed. Draft saves are allowed, but LIA confirmation is required for final privacy approval.
                             </span>
                           </div>
                         )}
@@ -1434,7 +1420,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                   <div className="p-4 rounded-lg bg-blue-50/80 border border-blue-200 text-blue-900 flex items-start gap-3">
                     <Info className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
                     <div className="space-y-1 text-xs">
-                      <span className="font-bold text-blue-950 block">
+                      <span className="font-normal text-blue-950 block">
                         Controller Legal Basis Requirements Not Applicable to Processor Role
                       </span>
                       <p className="text-blue-800 text-[11px]">
@@ -1462,10 +1448,10 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
               {/* Data Subjects Category Selector */}
               <div className="bg-slate-50 p-5 rounded-xl border border-slate-200 space-y-3">
                 <div className="flex items-center justify-between">
-                  <label className="block text-xs font-bold text-slate-900 uppercase tracking-wider">
+                  <label className="block text-xs font-bold text-slate-900">
                     Categories of Data Subjects *
                   </label>
-                  <span className="text-[11px] font-semibold text-slate-500">
+                  <span className="text-[11px] font-normal text-slate-500">
                     {(formData.dataSubjectCategories || []).length} Categories Selected
                   </span>
                 </div>
@@ -1494,9 +1480,9 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-1">
-                            <span className="font-bold text-xs text-slate-900">{cat}</span>
+                            <span className="font-normal text-xs text-slate-900">{cat}</span>
                             {isSelected && (
-                              <span className="text-[10px] font-extrabold bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full">
+                              <span className="text-[11px] font-normal bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full">
                                 {itemCount} Items
                               </span>
                             )}
@@ -1509,45 +1495,10 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
 
               </div>
 
-              {/* High-Risk Personal Data Warning Badge */}
-              {highRiskSelectedItems.length > 0 && (
-                <div className="p-4 rounded-xl bg-rose-50 border border-rose-200/90 text-rose-950 space-y-2 animate-in fade-in duration-200">
-                  <div className="flex items-center justify-between gap-2 border-b border-rose-200/80 pb-2">
-                    <div className="flex items-center gap-2 text-rose-700 font-extrabold text-xs uppercase tracking-wider">
-                      <AlertTriangle className="w-4 h-4 text-rose-600" />
-                      <span>High-risk personal data involved</span>
-                    </div>
-                    <span className="bg-rose-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
-                      {highRiskSelectedItems.length} High-Risk {highRiskSelectedItems.length === 1 ? 'Category' : 'Categories'} Flagged
-                    </span>
-                  </div>
-
-                  <p className="text-xs text-rose-800 leading-relaxed">
-                    This processing activity involves high-risk or special category personal data under GDPR Art. 9, CCPA Sensitive Data, or PCI-DSS:
-                  </p>
-
-                  <div className="flex flex-wrap gap-1.5 pt-1">
-                    {highRiskSelectedItems.map(item => (
-                      <span
-                        key={item.name}
-                        className="inline-flex items-center gap-1 bg-rose-100 text-rose-950 border border-rose-300 text-[11px] font-bold px-2.5 py-1 rounded-md"
-                      >
-                        <ShieldAlert className="w-3 h-3 text-rose-600" />
-                        {item.name} ({item.classification})
-                      </span>
-                    ))}
-                  </div>
-
-                  <p className="text-[11px] text-rose-600 font-medium italic pt-1">
-                    Note: High-risk detection flags compulsory regulatory review workflows, but does not block saving this processing activity.
-                  </p>
-                </div>
-              )}
-
               {/* Dynamic Cards per Data Subject Category */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between border-b border-slate-200 pb-2">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                  <h4 className="text-xs font-bold text-slate-700">
                     Data Subject Mappings ({formData.dataSubjectCategories?.length || 0})
                   </h4>
                   <span className="text-[11px] text-slate-500">
@@ -1558,7 +1509,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                 {(!formData.dataSubjectCategories || formData.dataSubjectCategories.length === 0) ? (
                   <div className="p-6 bg-slate-50 rounded-xl border border-dashed border-slate-300 text-center space-y-2">
                     <User className="w-6 h-6 text-slate-400 mx-auto" />
-                    <p className="text-xs font-semibold text-slate-700">No Data Subject Category Selected</p>
+                    <p className="text-xs font-normal text-slate-700">No Data Subject Category Selected</p>
                     <p className="text-[11px] text-slate-500 max-w-sm mx-auto">
                       Please select at least one Data Subject category above (e.g., Customers or Prospects) to map personal data categories.
                     </p>
@@ -1591,11 +1542,11 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
               {/* Group 1: Trimble Internal */}
               <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
                 <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-900 flex items-center gap-1.5">
+                  <h4 className="text-xs font-bold text-indigo-900 flex items-center gap-1.5">
                     <span className="w-2 h-2 rounded-full bg-indigo-600" />
                     Trimble Internal Recipients
                   </h4>
-                  <span className="text-[11px] font-semibold text-slate-500">
+                  <span className="text-[11px] font-normal text-slate-500">
                     {
                       internalRecipientOptions.filter(c =>
                         formData.recipientCategories?.includes(c)
@@ -1612,7 +1563,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                         key={cat}
                         className={`flex items-start gap-2 p-2.5 rounded-lg border text-xs cursor-pointer transition ${
                           isChecked
-                            ? 'bg-indigo-50/80 border-indigo-300 text-indigo-950 font-medium'
+                            ? 'bg-indigo-50/80 border-indigo-300 text-indigo-950 font-normal'
                             : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100/70'
                         }`}
                       >
@@ -1654,11 +1605,11 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
               {/* Group 2: External */}
               <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
                 <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-amber-900 flex items-center gap-1.5">
+                  <h4 className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
                     <span className="w-2 h-2 rounded-full bg-amber-500" />
                     External Recipients
                   </h4>
-                  <span className="text-[11px] font-semibold text-slate-500">
+                  <span className="text-[11px] font-normal text-slate-500">
                     {
                       externalRecipientOptions.filter(c =>
                         formData.recipientCategories?.includes(c)
@@ -1675,7 +1626,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                         key={cat}
                         className={`flex items-start gap-2 p-2.5 rounded-lg border text-xs cursor-pointer transition ${
                           isChecked
-                            ? 'bg-amber-50/80 border-amber-300 text-amber-950 font-medium'
+                            ? 'bg-amber-50/80 border-amber-300 text-amber-950 font-normal'
                             : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100/70'
                         }`}
                       >
@@ -1717,7 +1668,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                 {formData.recipientCategories?.includes('Third Party Vendors') && (
                   <div className="pt-2 border-t border-slate-200 mt-3 animate-in fade-in duration-150 space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-slate-800">
+                      <span className="text-xs font-normal text-slate-800">
                         Link Third Party Vendors (Inventory Selection)
                       </span>
                       <span className="text-[11px] text-slate-500">
@@ -1760,7 +1711,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                   <div className="max-w-2xl">
                     <label
                       htmlFor="source-location-preview"
-                      className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5"
+                      className="block text-xs font-bold text-slate-700 mb-1.5"
                     >
                       Source Location
                     </label>
@@ -1788,7 +1739,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                   ].map(option => (
                     <label
                       key={option.value}
-                      className={`flex items-center gap-2 px-3.5 py-2 rounded-lg border text-xs font-semibold cursor-pointer transition ${
+                      className={`flex items-center gap-2 px-3.5 py-2 rounded-lg border text-xs font-normal cursor-pointer transition ${
                         formData.hasInternationalTransfer === option.value
                           ? option.value === 'Yes'
                             ? 'bg-amber-50 border-amber-400 text-amber-900 shadow-2xs'
@@ -1816,15 +1767,6 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                   ))}
                 </div>
               </div>
-
-              {/* Warning for "Unknown" status */}
-              {formData.hasInternationalTransfer === 'Unknown' && (
-                <RiskWarningBanner
-                  title="Transfer Status Warning"
-                  description="International transfer status requires review. Please investigate cross-border storage and sub-processor hosting locations before finalizing this record."
-                  severity="warning"
-                />
-              )}
 
               {formData.hasInternationalTransfer === 'Yes' && (
                 <div className="space-y-4 animate-in fade-in duration-150">
@@ -1880,7 +1822,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                         <div className="max-w-2xl">
                           <label
                             htmlFor={`destination-location-${assetId}`}
-                            className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5"
+                            className="block text-xs font-bold text-slate-700 mb-1.5"
                           >
                             Destination Location
                           </label>
@@ -1963,7 +1905,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                         : keys;
                       return [...base, `blank-${Date.now()}`];
                     })}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-xs font-normal text-slate-700 hover:bg-slate-50"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     Add another destination asset for this processing activity?
@@ -1997,16 +1939,16 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
               <div className="bg-slate-50 p-4.5 rounded-xl border border-slate-200 space-y-4">
                 <div className="flex items-center justify-between border-b border-slate-200 pb-2.5">
                   <div>
-                    <h4 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                    <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
                       <Clock className="w-4 h-4 text-indigo-600" />
                       Data Retention Policy
-                      <span className="text-rose-600 font-bold">*</span>
+                      <span className="text-rose-600 font-normal">*</span>
                     </h4>
                   </div>
                 </div>
 
                 <div className="space-y-3">
-                  <label className="text-xs font-semibold text-slate-700 block">
+                  <label className="text-xs font-bold text-slate-700 block">
                     Retention Policy Type <span className="text-rose-600">*</span>
                   </label>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -2038,7 +1980,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                         )}
                       </div>
                       <div>
-                        <span className="font-bold text-xs text-slate-900 block">Custom Retention Schedule</span>
+                        <span className="font-normal text-xs text-slate-900 block">Custom Retention Schedule</span>
                       </div>
                     </button>
 
@@ -2070,7 +2012,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                         )}
                       </div>
                       <div>
-                        <span className="font-bold text-xs text-slate-900 block">None (No Defined Policy)</span>
+                        <span className="font-normal text-xs text-slate-900 block">None (No Defined Policy)</span>
                       </div>
                     </button>
                   </div>
@@ -2078,7 +2020,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                   {/* Custom Option: Required Text Field */}
                   {selectedRetentionType(formData) === 'Custom' && (
                     <div className="space-y-1.5 pt-2 animate-in fade-in duration-150">
-                      <label className="text-xs font-semibold text-slate-700 block">
+                      <label className="text-xs font-bold text-slate-700 block">
                         Describe the retention period or retention policy <span className="text-rose-600">*</span>
                       </label>
                       <textarea
@@ -2092,7 +2034,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                           }))
                         }
                         placeholder="e.g., 7 years after termination of contract, Account lifetime + 30 days, or 12 months after collection"
-                        className="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white text-xs text-slate-900 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
+                        className="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white text-sm text-slate-900 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
                       />
                       <p className="text-[11px] text-slate-500">
                         Supports entries such as "7 years after termination of contract", "Account lifetime + 30 days", or "12 months after collection".
@@ -2129,6 +2071,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                 selectedTspRecordIds={formData.tspIds || []}
                 onTspRecordIdsChange={ids => setFormData(prev => ({ ...prev, tspIds: ids }))}
                 showScopeNotice={false}
+                showPendingNotice={false}
               />
             </div>
           )}
@@ -2205,8 +2148,8 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                   </h3>
                 </div>
                 <div className="text-right">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Completeness</span>
-                  <span className="text-base font-mono font-bold text-indigo-600">{percentage}%</span>
+                  <span className="text-[11px] font-normal text-slate-400 block">Completeness</span>
+                  <span className="text-base font-mono font-normal text-indigo-600">{percentage}%</span>
                 </div>
               </div>
 
@@ -2228,8 +2171,8 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                       <XCircle className="w-4 h-4" />
                     </div>
                     <div>
-                      <span className="text-xs font-bold block uppercase tracking-wider text-[10px]">Blocking Errors</span>
-                      <span className="text-lg font-bold font-mono">{validationReport.errors.length}</span>
+                      <span className="text-xs font-normal block text-[11px]">Blocking Errors</span>
+                      <span className="text-lg font-normal font-mono">{validationReport.errors.length}</span>
                     </div>
                   </div>
                 </div>
@@ -2250,8 +2193,8 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                       <AlertTriangle className="w-4 h-4" />
                     </div>
                     <div>
-                      <span className="text-xs font-bold block uppercase tracking-wider text-[10px]">Privacy Warnings</span>
-                      <span className="text-lg font-bold font-mono">{validationReport.warnings.length}</span>
+                      <span className="text-xs font-normal block text-[11px]">Privacy Warnings</span>
+                      <span className="text-lg font-normal font-mono">{validationReport.warnings.length}</span>
                     </div>
                   </div>
                 </div>
@@ -2262,8 +2205,8 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                       <Info className="w-4 h-4" />
                     </div>
                     <div>
-                      <span className="text-xs font-bold block uppercase tracking-wider text-[10px]">Info Guidance</span>
-                      <span className="text-lg font-bold font-mono">{validationReport.infos.length}</span>
+                      <span className="text-xs font-normal block text-[11px]">Info Guidance</span>
+                      <span className="text-lg font-normal font-mono">{validationReport.infos.length}</span>
                     </div>
                   </div>
                 </div>
@@ -2272,11 +2215,11 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
               {/* COMPLIANCE AUDIT ISSUES BREAKDOWN */}
               <div className="bg-slate-50 rounded-xl border border-slate-200 p-4 space-y-3">
                 <div className="flex items-center justify-between border-b border-slate-200 pb-2.5">
-                  <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                  <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
                     <ShieldCheck className="w-4 h-4 text-indigo-600" />
                     Record Validation Taxonomy & Audit Log
                   </h4>
-                  <span className="text-[11px] font-medium text-slate-500">
+                  <span className="text-[11px] font-normal text-slate-500">
                     {validationReport.errors.length + validationReport.warnings.length + validationReport.infos.length} Audit Item(s)
                   </span>
                 </div>
@@ -2286,7 +2229,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                 validationReport.infos.length === 0 ? (
                   <div className="p-4 bg-emerald-50 rounded-lg border border-emerald-200 text-emerald-900 flex items-center gap-2.5 text-xs">
                     <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-                    <span className="font-semibold">
+                    <span className="font-normal">
                       All required fields are complete and validated! No errors or warnings identified.
                     </span>
                   </div>
@@ -2302,15 +2245,15 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                           <XCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
                           <div>
                             <div className="flex items-center gap-2">
-                              <span className="px-2 py-0.5 rounded font-bold text-[10px] bg-rose-200 text-rose-950 uppercase">
+                              <span className="px-2 py-0.5 rounded font-normal text-[11px] bg-rose-200 text-rose-950">
                                 ERROR
                               </span>
-                              <span className="font-bold text-slate-900">{issue.message}</span>
+                              <span className="font-normal text-slate-900">{issue.message}</span>
                             </div>
                             {issue.description && (
                               <p className="text-slate-600 text-[11px] mt-0.5">{issue.description}</p>
                             )}
-                            <span className="text-[10px] font-medium text-slate-400 block mt-1">
+                            <span className="text-[11px] font-normal text-slate-400 block mt-1">
                               Step {issue.step}: {issue.stepName} {issue.field ? `• Field: ${issue.field}` : ''}
                             </span>
                           </div>
@@ -2318,7 +2261,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                         <button
                           type="button"
                           onClick={() => setCurrentStep(issue.step)}
-                          className="px-2.5 py-1 rounded bg-white border border-rose-300 text-rose-800 hover:bg-rose-100 font-semibold text-[11px] transition shrink-0"
+                          className="px-2.5 py-1 rounded bg-white border border-rose-300 text-rose-800 hover:bg-rose-100 font-normal text-[11px] transition shrink-0"
                         >
                           Fix in Step {issue.step} →
                         </button>
@@ -2335,15 +2278,15 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                           <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                           <div>
                             <div className="flex items-center gap-2">
-                              <span className="px-2 py-0.5 rounded font-bold text-[10px] bg-amber-200 text-amber-950 uppercase">
+                              <span className="px-2 py-0.5 rounded font-normal text-[11px] bg-amber-200 text-amber-950">
                                 WARNING
                               </span>
-                              <span className="font-bold text-slate-900">{issue.message}</span>
+                              <span className="font-normal text-slate-900">{issue.message}</span>
                             </div>
                             {issue.description && (
                               <p className="text-slate-600 text-[11px] mt-0.5">{issue.description}</p>
                             )}
-                            <span className="text-[10px] font-medium text-slate-400 block mt-1">
+                            <span className="text-[11px] font-normal text-slate-400 block mt-1">
                               Step {issue.step}: {issue.stepName} {issue.field ? `• Field: ${issue.field}` : ''}
                             </span>
                           </div>
@@ -2351,7 +2294,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                         <button
                           type="button"
                           onClick={() => setCurrentStep(issue.step)}
-                          className="px-2.5 py-1 rounded bg-white border border-amber-300 text-amber-900 hover:bg-amber-100 font-semibold text-[11px] transition shrink-0"
+                          className="px-2.5 py-1 rounded bg-white border border-amber-300 text-amber-900 hover:bg-amber-100 font-normal text-[11px] transition shrink-0"
                         >
                           Review Step {issue.step} →
                         </button>
@@ -2368,15 +2311,15 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                           <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
                           <div>
                             <div className="flex items-center gap-2">
-                              <span className="px-2 py-0.5 rounded font-bold text-[10px] bg-blue-200 text-blue-950 uppercase">
+                              <span className="px-2 py-0.5 rounded font-normal text-[11px] bg-blue-200 text-blue-950">
                                 INFO
                               </span>
-                              <span className="font-bold text-slate-900">{issue.message}</span>
+                              <span className="font-normal text-slate-900">{issue.message}</span>
                             </div>
                             {issue.description && (
                               <p className="text-slate-600 text-[11px] mt-0.5">{issue.description}</p>
                             )}
-                            <span className="text-[10px] font-medium text-slate-400 block mt-1">
+                            <span className="text-[11px] font-normal text-slate-400 block mt-1">
                               Step {issue.step}: {issue.stepName}
                             </span>
                           </div>
@@ -2384,7 +2327,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                         <button
                           type="button"
                           onClick={() => setCurrentStep(issue.step)}
-                          className="px-2.5 py-1 rounded bg-white border border-blue-200 text-blue-800 hover:bg-blue-100 font-semibold text-[11px] transition shrink-0"
+                          className="px-2.5 py-1 rounded bg-white border border-blue-200 text-blue-800 hover:bg-blue-100 font-normal text-[11px] transition shrink-0"
                         >
                           View Step {issue.step} →
                         </button>
@@ -2398,32 +2341,32 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* 1. Overview & Role */}
                 <div className="p-4 rounded-lg bg-slate-50 border border-slate-200 space-y-2 text-xs">
-                  <span className="font-bold text-slate-900 uppercase tracking-wider text-[11px] text-indigo-600 block">
+                  <span className="font-normal text-slate-900 text-[11px] text-indigo-600 block">
                     1. Overview & Role
                   </span>
                   <div>
-                    <span className="text-slate-500 font-medium">Name: </span>
-                    <strong className="text-slate-900">{formData.name || 'N/A'}</strong>
+                    <span className="text-slate-500 font-normal">Name: </span>
+                    <span className="text-slate-900">{formData.name || 'N/A'}</span>
                   </div>
                   <div>
-                    <span className="text-slate-500 font-medium">Owner: </span>
+                    <span className="text-slate-500 font-normal">Owner: </span>
                     <span className="text-slate-800">{formData.owner || 'Unassigned'}</span>
                   </div>
                   <div>
-                    <span className="text-slate-500 font-medium">Role: </span>
-                    <strong className="text-slate-900">{formData.role || 'Unassigned'}</strong>
+                    <span className="text-slate-500 font-normal">Role: </span>
+                    <span className="text-slate-900">{formData.role || 'Unassigned'}</span>
                   </div>
                   {usesControllerWizardOptions(formData.role) || formData.role === 'Processor (B2B sales only)' ? (
                     <>
                       <div>
-                        <span className="text-slate-500 font-medium">Art. 6 Legal Basis: </span>
-                        <strong className="text-slate-900">{formData.legalBasis || 'Unassigned'}</strong>
+                        <span className="text-slate-500 font-normal">Art. 6 Legal Basis: </span>
+                        <span className="text-slate-900">{formData.legalBasis || 'Unassigned'}</span>
                       </div>
                       {(formData.legalBasis === 'Legitimate Interest of the Controller' || formData.legalBasis === 'Legitimate Interest') && (
                         <div>
-                          <span className="text-slate-500 font-medium">LIA Confirmation: </span>
+                          <span className="text-slate-500 font-normal">LIA Confirmation: </span>
                           <span
-                            className={`font-bold px-2 py-0.5 rounded text-[11px] ${
+                            className={`font-normal px-2 py-0.5 rounded text-[11px] ${
                               formData.liaFiled ? 'bg-emerald-100 text-emerald-900' : 'bg-amber-100 text-amber-900'
                             }`}
                           >
@@ -2436,7 +2379,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                     </>
                   ) : (
                     <div>
-                      <span className="text-slate-500 font-medium">Legal Basis: </span>
+                      <span className="text-slate-500 font-normal">Legal Basis: </span>
                       <span className="text-slate-500 italic">Established by Controller (Processor Record)</span>
                     </div>
                   )}
@@ -2444,23 +2387,23 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
 
                 {/* 6. Data Retention Summary */}
                 <div className="p-4 rounded-lg bg-slate-50 border border-slate-200 space-y-2 text-xs">
-                  <span className="font-bold text-slate-900 uppercase tracking-wider text-[11px] text-indigo-600 block">
+                  <span className="font-normal text-slate-900 text-[11px] text-indigo-600 block">
                     6. Data Retention
                   </span>
                   <div>
-                    <span className="text-slate-500 font-medium">Retention Policy Type: </span>
-                    <span className="font-semibold text-slate-900">
+                    <span className="text-slate-500 font-normal">Retention Policy Type: </span>
+                    <span className="font-normal text-slate-900">
                       {selectedRetentionType(formData) || 'Unassigned'}
                     </span>
                   </div>
                   <div>
-                    <span className="text-slate-500 font-medium">Retention Period / Schedule: </span>
+                    <span className="text-slate-500 font-normal">Retention Period / Schedule: </span>
                     {selectedRetentionType(formData) === 'None' ? (
-                      <span className="font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-300 text-[11px] inline-block mt-0.5">
+                      <span className="font-normal text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-300 text-[11px] inline-block mt-0.5">
                         No defined data retention policy.
                       </span>
                     ) : selectedRetentionType(formData) === 'Custom' ? (
-                      <span className="text-slate-800 font-medium">{formData.retentionPeriod || 'None'}</span>
+                      <span className="text-slate-800 font-normal">{formData.retentionPeriod || 'None'}</span>
                     ) : (
                       <span className="text-slate-500">Unassigned</span>
                     )}
@@ -2469,13 +2412,13 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
 
                 {/* 7. Technical & Organisational Security Measures (TOMs) & TSP Summary */}
                 <div className="p-4 rounded-lg bg-slate-50 border border-slate-200 space-y-2 text-xs">
-                  <span className="font-bold text-slate-900 uppercase tracking-wider text-[11px] text-indigo-600 block">
+                  <span className="font-normal text-slate-900 text-[11px] text-indigo-600 block">
                     7. Security Measures & TSP Registration Summary
                   </span>
                   <div>
-                    <span className="text-slate-500 font-medium">TSP Registration Status: </span>
+                    <span className="text-slate-500 font-normal">TSP Registration Status: </span>
                     <span
-                      className={`font-bold px-2 py-0.5 rounded text-[11px] inline-flex items-center gap-1 ${
+                      className={`font-normal px-2 py-0.5 rounded text-[11px] inline-flex items-center gap-1 ${
                         formData.tspStatus === 'Yes'
                           ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
                           : formData.tspStatus === 'Pending'
@@ -2491,25 +2434,25 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                   </div>
                   {formData.tspStatus === 'N/A' && (
                     <div>
-                      <span className="text-slate-500 font-medium">TSP Justification: </span>
+                      <span className="text-slate-500 font-normal">TSP Justification: </span>
                       <span className="text-slate-800 italic block mt-0.5">
                         {formData.tspJustification || 'No justification provided'}
                       </span>
                     </div>
                   )}
                   <div>
-                    <span className="text-slate-500 font-medium">Documented TOMs ({formData.toms?.length || 0}): </span>
+                    <span className="text-slate-500 font-normal">Documented TOMs ({formData.toms?.length || 0}): </span>
                     {formData.toms && formData.toms.length > 0 ? (
                       <div className="flex flex-wrap gap-1 mt-1">
                         {formData.toms.map(tom => (
-                          <span key={tom} className="px-2 py-0.5 rounded bg-indigo-50 text-indigo-900 border border-indigo-200 text-[10px] font-semibold">
+                          <span key={tom} className="px-2 py-0.5 rounded bg-indigo-50 text-indigo-900 border border-indigo-200 text-[11px] font-normal">
                             {tom}
                             {tom === 'Other' && formData.tomsOther && ` (${formData.tomsOther})`}
                           </span>
                         ))}
                       </div>
                     ) : (
-                      <span className="text-amber-700 font-semibold block mt-0.5">No TOMs selected</span>
+                      <span className="text-amber-700 font-normal block mt-0.5">No TOMs selected</span>
                     )}
                   </div>
                 </div>
@@ -2525,7 +2468,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
               <button
                 type="button"
                 onClick={handleSaveAndClose}
-                className="px-3.5 py-1.5 rounded-md border border-slate-300 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-100 transition shadow-2xs flex items-center gap-1.5"
+                className="px-3.5 py-1.5 rounded-md border border-slate-300 bg-white text-xs font-normal text-slate-700 hover:bg-slate-100 transition shadow-2xs flex items-center gap-1.5"
               >
                 <Save className="w-3.5 h-3.5 text-slate-500" />
                 Save as Draft
@@ -2536,7 +2479,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
               <button
                 type="button"
                 onClick={() => setCurrentStep(prev => prev - 1)}
-                className="px-3 py-1.5 rounded-md border border-slate-300 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-100 transition flex items-center gap-1"
+                className="px-3 py-1.5 rounded-md border border-slate-300 bg-white text-xs font-normal text-slate-700 hover:bg-slate-100 transition flex items-center gap-1"
               >
                 <ArrowLeft className="w-3.5 h-3.5" />
                 Back
@@ -2549,7 +2492,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
               <button
                 type="button"
                 onClick={() => setCurrentStep(prev => Math.min(8, prev + 1))}
-                className="px-4 py-2 rounded-md bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 transition flex items-center gap-1.5 shadow-sm"
+                className="px-4 py-2 rounded-md bg-indigo-600 text-white text-xs font-normal hover:bg-indigo-700 transition flex items-center gap-1.5 shadow-sm"
               >
                 Next Section
                 <ArrowRight className="w-4 h-4" />
@@ -2559,7 +2502,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
               <button
                 type="button"
                 onClick={handleSaveAndClose}
-                className="px-5 py-2 rounded-md bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 transition flex items-center gap-1.5 shadow-sm"
+                className="px-5 py-2 rounded-md bg-emerald-600 text-white text-xs font-normal hover:bg-emerald-700 transition flex items-center gap-1.5 shadow-sm"
               >
                 <Save className="w-4 h-4" />
                 Update Record
@@ -2568,7 +2511,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
               <button
                 type="submit"
                 onClick={handleFinalSubmit}
-                className="px-5 py-2 rounded-md bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 transition flex items-center gap-1.5 shadow-sm"
+                className="px-5 py-2 rounded-md bg-emerald-600 text-white text-xs font-normal hover:bg-emerald-700 transition flex items-center gap-1.5 shadow-sm"
               >
                 <Check className="w-4 h-4" />
                 Save and Publish
@@ -2590,7 +2533,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
             </div>
 
             <p className="text-xs text-slate-600 leading-relaxed">
-              Switching role from <strong>{formData.role}</strong> to <strong>{pendingRoleSwitch}</strong> will reset role-specific field entries (e.g. Purposes of Processing or Categories of Processing).
+              Switching role from <span>{formData.role}</span> to <span>{pendingRoleSwitch}</span> will reset role-specific field entries (e.g. Purposes of Processing or Categories of Processing).
             </p>
             <p className="text-xs text-slate-500">
               Compatible shared information (record name, description, owner, DPO contact, and relationships) will be preserved.
@@ -2600,14 +2543,14 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
               <button
                 type="button"
                 onClick={() => setPendingRoleSwitch(null)}
-                className="px-3.5 py-2 rounded-md border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition"
+                className="px-3.5 py-2 rounded-md border border-slate-300 text-xs font-normal text-slate-700 hover:bg-slate-100 transition"
               >
                 Cancel Role Switch
               </button>
               <button
                 type="button"
                 onClick={() => applyRoleChange(pendingRoleSwitch)}
-                className="px-4 py-2 rounded-md bg-rose-600 text-white text-xs font-semibold hover:bg-rose-700 transition shadow-sm"
+                className="px-4 py-2 rounded-md bg-rose-600 text-white text-xs font-normal hover:bg-rose-700 transition shadow-sm"
               >
                 Confirm Role Switch
               </button>
@@ -2626,19 +2569,19 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
               </div>
               <div>
                 <h4 className="text-base font-bold text-slate-900">Remove Data Subject Category?</h4>
-                <p className="text-xs text-amber-700 font-semibold mt-0.5">
+                <p className="text-xs text-amber-700 font-normal mt-0.5">
                   Category: {pendingDataSubjectRemoval.category}
                 </p>
               </div>
             </div>
 
             <div className="p-3.5 bg-amber-50 rounded-lg border border-amber-200 text-xs text-amber-900 space-y-1">
-              <p className="font-semibold">
+              <p className="font-normal">
                 ⚠️ Personal Data Categories are already assigned to this Data Subject!
               </p>
               <p className="text-amber-800 leading-relaxed">
-                Unchecking <strong>"{pendingDataSubjectRemoval.category}"</strong> will delete the{' '}
-                <strong>{pendingDataSubjectRemoval.itemCount} personal data category(ies)</strong> currently mapped to it.
+                Unchecking <span>"{pendingDataSubjectRemoval.category}"</span> will delete the{' '}
+                <span>{pendingDataSubjectRemoval.itemCount} personal data category(ies)</span> currently mapped to it.
               </p>
             </div>
 
@@ -2650,14 +2593,14 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
               <button
                 type="button"
                 onClick={() => setPendingDataSubjectRemoval(null)}
-                className="px-3.5 py-2 rounded-md border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition"
+                className="px-3.5 py-2 rounded-md border border-slate-300 text-xs font-normal text-slate-700 hover:bg-slate-100 transition"
               >
                 Cancel (Keep Category)
               </button>
               <button
                 type="button"
                 onClick={() => executeRemoveDataSubjectCategory(pendingDataSubjectRemoval.category)}
-                className="px-4 py-2 rounded-md bg-rose-600 text-white text-xs font-semibold hover:bg-rose-700 transition shadow-sm flex items-center gap-1.5"
+                className="px-4 py-2 rounded-md bg-rose-600 text-white text-xs font-normal hover:bg-rose-700 transition shadow-sm flex items-center gap-1.5"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 Confirm & Clear Data

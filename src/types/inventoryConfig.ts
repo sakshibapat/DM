@@ -77,6 +77,7 @@ const group = (
 const STATUSES = ['Approved', 'Under Review', 'Draft', 'Archived'];
 const PROCESSING_ACTIVITY_STATUSES = ['Published', 'Under Review', 'Draft', 'Archived'];
 const TSP_STATUSES = ['Yes', 'No', 'Pending', 'N/A'];
+const PROCESSING_ACTIVITY_TSP_STATUSES = ['Yes', 'No', 'N/A'];
 
 export const DEFAULT_INVENTORY_CONFIG: InventoryConfigDocument = {
   version: INVENTORY_CONFIG_VERSION,
@@ -101,7 +102,7 @@ export const DEFAULT_INVENTORY_CONFIG: InventoryConfigDocument = {
         transferSafeguards: group('transferSafeguards', 'Transfer Safeguards', 'International transfer safeguards.', TRANSFER_SAFEGUARD_OPTIONS),
         retentionPolicyTypes: group('retentionPolicyTypes', 'Retention Policy Types', 'Available retention policy modes.', ['Custom', 'None']),
         toms: group('toms', 'Security Measures (TOMs)', 'Technical and organisational measures.', TOMS_OPTIONS),
-        tspStatuses: group('tspStatuses', 'TSP Registration Statuses', 'TSP catalog registration statuses.', TSP_STATUSES),
+        tspStatuses: group('tspStatuses', 'TSP Registration Statuses', 'TSP catalog registration statuses.', PROCESSING_ACTIVITY_TSP_STATUSES),
       },
     },
     tspReferences: {

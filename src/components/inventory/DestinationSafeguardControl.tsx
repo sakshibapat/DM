@@ -34,7 +34,7 @@ export const DestinationSafeguardControl: React.FC<DestinationSafeguardControlPr
 
   return (
     <div className="space-y-3 border-t border-slate-200 pt-4">
-      <label className="block text-xs font-bold text-slate-900">
+      <label className="block text-xs font-normal text-slate-900">
         {question}
       </label>
       {view === 'other-draft' ? (
@@ -68,7 +68,7 @@ export const DestinationSafeguardControl: React.FC<DestinationSafeguardControlPr
           <button
             type="button"
             onClick={() => onClear(assetId)}
-            className="cursor-pointer text-left text-xs font-semibold text-indigo-950"
+            className="cursor-pointer text-left text-xs font-normal text-indigo-950"
           >
             {savedOther}
           </button>
@@ -86,7 +86,7 @@ export const DestinationSafeguardControl: React.FC<DestinationSafeguardControlPr
           {SAFEGUARD_PRESETS.map(option => (
             <label
               key={option}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg border text-xs font-semibold cursor-pointer transition ${
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg border text-xs font-normal cursor-pointer transition ${
                 selectedPreset === option
                   ? 'bg-indigo-50 border-indigo-300 text-indigo-950 shadow-2xs'
                   : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100/80'
@@ -112,7 +112,7 @@ export const DestinationSafeguardControl: React.FC<DestinationSafeguardControlPr
               {option}
             </label>
           ))}
-          <label className="flex items-center gap-2 px-3.5 py-2 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-700 cursor-pointer hover:bg-slate-100/80">
+          <label className="flex items-center gap-2 px-3.5 py-2 rounded-lg border border-slate-200 bg-white text-xs font-normal text-slate-700 cursor-pointer hover:bg-slate-100/80">
             <input
               type="radio"
               name={`transferSafeguard-${assetId}`}

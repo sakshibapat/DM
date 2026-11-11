@@ -7,7 +7,6 @@ import {
   X,
   AlertTriangle,
   ShieldAlert,
-  Filter,
 } from 'lucide-react';
 import {
   CONTROLLED_PERSONAL_DATA_ITEMS,
@@ -32,8 +31,6 @@ export const DataSubjectPersonalDataCard: React.FC<DataSubjectPersonalDataCardPr
 }) => {
   const listRef = useRef<HTMLDivElement>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [classificationFilter, setClassificationFilter] = useState<'All' | 'High Risk' | PersonalDataClassification>('All');
-
   // Choose icon based on category name
   const getSubjectIcon = (cat: string) => {
     if (cat.toLowerCase().includes('customer') || cat.toLowerCase().includes('prospect')) {
@@ -59,14 +56,10 @@ export const DataSubjectPersonalDataCard: React.FC<DataSubjectPersonalDataCardPr
         meta.regulatoryTags.some(t => t.toLowerCase().includes(searchQuery.toLowerCase())) ||
         meta.classification.toLowerCase().includes(searchQuery.toLowerCase());
 
-      if (!matchesSearch) return false;
+      return matchesSearch;
 
-      // Classification filter
-      if (classificationFilter === 'All') return true;
-      if (classificationFilter === 'High Risk') return meta.isHighRisk;
-      return meta.classification === classificationFilter;
     });
-  }, [availableDataItems, assignedDataItems, searchQuery, classificationFilter]);
+  }, [availableDataItems, assignedDataItems, searchQuery]);
 
   const toggleItem = (itemName: string) => {
     if (assignedDataItems.includes(itemName)) {
@@ -102,7 +95,7 @@ export const DataSubjectPersonalDataCard: React.FC<DataSubjectPersonalDataCardPr
             <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
               {subjectCategory}
               {highRiskAssignedCount > 0 && (
-                <span className="inline-flex items-center gap-1 bg-rose-100 text-rose-800 text-[10px] font-extrabold px-2 py-0.5 rounded-full border border-rose-200">
+                <span className="inline-flex items-center gap-1 bg-rose-100 text-rose-800 text-[10px] font-normal px-2 py-0.5 rounded-full border border-rose-200">
                   <ShieldAlert className="w-3 h-3 text-rose-600" />
                   {highRiskAssignedCount} High Risk
                 </span>
@@ -121,7 +114,7 @@ export const DataSubjectPersonalDataCard: React.FC<DataSubjectPersonalDataCardPr
             <button
               type="button"
               onClick={clearAll}
-              className="px-2.5 py-1 text-[11px] font-medium text-slate-600 hover:text-rose-600 hover:bg-rose-50 rounded transition"
+              className="px-2.5 py-1 text-[11px] font-normal text-slate-600 hover:text-rose-600 hover:bg-rose-50 rounded transition"
             >
               Clear items
             </button>
@@ -129,7 +122,7 @@ export const DataSubjectPersonalDataCard: React.FC<DataSubjectPersonalDataCardPr
           <button
             type="button"
             onClick={onRemoveSubjectCategory}
-            className="px-2.5 py-1 text-[11px] font-semibold text-slate-500 hover:text-rose-600 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 rounded-md transition flex items-center gap-1"
+            className="px-2.5 py-1 text-[11px] font-normal text-slate-500 hover:text-rose-600 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 rounded-md transition flex items-center gap-1"
             title="Remove Data Subject category"
           >
             <X className="w-3.5 h-3.5" />
@@ -142,7 +135,7 @@ export const DataSubjectPersonalDataCard: React.FC<DataSubjectPersonalDataCardPr
       <div className="p-4 space-y-4">
         {/* Personal data categories, shown as soon as this data subject is chosen */}
         <div ref={listRef} className="space-y-2 scroll-mt-2">
-          <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider">
+          <label className="block text-xs font-normal text-slate-800">
             Select Categories of Personal Data for <span className="text-indigo-600">{subjectCategory}</span>:
           </label>
 
@@ -168,46 +161,21 @@ export const DataSubjectPersonalDataCard: React.FC<DataSubjectPersonalDataCardPr
                 )}
               </div>
 
-              <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1 mr-1">
-                  <Filter className="w-3 h-3" /> Filter:
-                </span>
-                {(['All', 'High Risk', 'Restricted', 'Confidential', 'Internal'] as const).map(filterVal => {
-                  const isActive = classificationFilter === filterVal;
-                  return (
-                    <button
-                      key={filterVal}
-                      type="button"
-                      onClick={() => setClassificationFilter(filterVal)}
-                      className={`px-2 py-0.5 rounded-full font-semibold transition ${
-                        isActive
-                          ? filterVal === 'High Risk'
-                            ? 'bg-rose-600 text-white'
-                            : 'bg-indigo-600 text-white'
-                          : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
-                      }`}
-                    >
-                      {filterVal}
-                    </button>
-                  );
-                })}
-              </div>
-
-              <div className="flex items-center justify-between pt-1 border-t border-slate-200/60 text-[11px] font-medium text-slate-500">
+              <div className="flex items-center justify-between pt-1 border-t border-slate-200/60 text-[11px] font-normal text-slate-500">
                 <span>Showing {filteredItems.length} of {availableDataItems.length} items</span>
                 <button
                   type="button"
                   onClick={selectAllFiltered}
-                  className="text-indigo-600 font-semibold hover:underline"
+                  className="text-indigo-600 font-normal hover:underline"
                 >
                   Select All Filtered
                 </button>
               </div>
             </div>
 
-            <div className="p-2 divide-y divide-slate-100">
+            <div className="p-2 grid grid-cols-1 md:grid-cols-3 gap-1">
               {filteredItems.length === 0 ? (
-                <div className="py-6 text-center text-xs text-slate-400">
+                <div className="md:col-span-3 py-6 text-center text-xs text-slate-400">
                   No matching personal data categories found.
                 </div>
               ) : (
@@ -218,7 +186,7 @@ export const DataSubjectPersonalDataCard: React.FC<DataSubjectPersonalDataCardPr
                     <label
                       key={itemName}
                       className={`p-2 rounded-lg flex items-start gap-2.5 cursor-pointer transition select-none ${
-                        isChecked ? 'bg-indigo-50/60 font-semibold' : 'hover:bg-slate-50'
+                        isChecked ? 'bg-indigo-50/60 font-normal' : 'hover:bg-slate-50'
                       }`}
                     >
                       <input
@@ -229,34 +197,12 @@ export const DataSubjectPersonalDataCard: React.FC<DataSubjectPersonalDataCardPr
                       />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2">
-                          <span className="text-xs text-slate-900 font-medium leading-tight">
+                          <span className="text-xs text-slate-900 font-normal leading-tight">
                             {itemName}
                           </span>
                           <div className="flex items-center gap-1 shrink-0">
                             <ClassificationBadge classification={meta.classification} />
-                            {meta.isHighRisk && (
-                              <span className="inline-flex items-center gap-0.5 bg-rose-100 text-rose-800 text-[10px] font-extrabold px-1.5 py-0.5 rounded border border-rose-200">
-                                <AlertTriangle className="w-2.5 h-2.5 text-rose-600" />
-                                High Risk
-                              </span>
-                            )}
                           </div>
-                        </div>
-
-                        <div className="flex flex-wrap items-center gap-1 mt-1">
-                          {meta.regulatoryTags.map(tag => (
-                            <span
-                              key={tag}
-                              className="text-[10px] bg-slate-100 text-slate-600 font-medium px-1.5 py-0.2 rounded"
-                            >
-                              {tag}
-                            </span>
-                          ))}
-                          {meta.description && (
-                            <span className="text-[10px] text-slate-400 truncate max-w-xs ml-1">
-                              — {meta.description}
-                            </span>
-                          )}
                         </div>
                       </div>
                     </label>
@@ -267,64 +213,6 @@ export const DataSubjectPersonalDataCard: React.FC<DataSubjectPersonalDataCardPr
           </div>
         </div>
 
-        {/* Selected Items Grid / Badges */}
-        {assignedDataItems.length > 0 ? (
-          <div className="space-y-2 pt-1">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                Assigned Personal Data Categories ({assignedDataItems.length}):
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {assignedDataItems.map(itemName => {
-                const meta = getPersonalDataMetadata(itemName);
-                return (
-                  <div
-                    key={itemName}
-                    className={`p-2.5 rounded-lg border text-xs flex items-start justify-between gap-2 transition ${
-                      meta.isHighRisk
-                        ? 'bg-rose-50/50 border-rose-200 text-rose-950'
-                        : meta.classification === 'Restricted'
-                        ? 'bg-purple-50/40 border-purple-200 text-slate-900'
-                        : meta.classification === 'Confidential'
-                        ? 'bg-amber-50/40 border-amber-200 text-slate-900'
-                        : 'bg-slate-50/80 border-slate-200 text-slate-900'
-                    }`}
-                  >
-                    <div className="space-y-1 min-w-0">
-                      <div className="flex items-center gap-1.5 font-bold text-slate-900 leading-tight">
-                        <span className="truncate">{itemName}</span>
-                      </div>
-
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <ClassificationBadge classification={meta.classification} />
-                        <RiskBadge riskLevel={meta.riskLevel} isHighRisk={meta.isHighRisk} />
-                        {meta.regulatoryTags.slice(0, 2).map(tag => (
-                          <span
-                            key={tag}
-                            className="text-[10px] bg-white/80 border border-slate-200 text-slate-600 px-1.5 py-0.2 rounded font-medium"
-                          >
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => toggleItem(itemName)}
-                      className="text-slate-400 hover:text-rose-600 hover:bg-rose-100 p-1 rounded transition shrink-0"
-                      title="Remove item"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        ) : null}
       </div>
     </div>
   );
@@ -332,22 +220,24 @@ export const DataSubjectPersonalDataCard: React.FC<DataSubjectPersonalDataCardPr
 
 // Helper badge for classification
 function ClassificationBadge({ classification }: { classification: PersonalDataClassification }) {
+  // Only Restricted items get a classification tag; Confidential and Internal are not shown.
+  if (classification !== 'Restricted') return null;
   if (classification === 'Restricted') {
     return (
-      <span className="inline-flex items-center gap-0.5 bg-purple-100 text-purple-900 border border-purple-200 text-[10px] font-bold px-1.5 py-0.2 rounded">
+      <span className="inline-flex items-center gap-0.5 bg-rose-100 text-rose-900 border border-rose-200 text-[10px] font-normal px-1.5 py-0.2 rounded">
         Restricted
       </span>
     );
   }
   if (classification === 'Confidential') {
     return (
-      <span className="inline-flex items-center gap-0.5 bg-amber-100 text-amber-900 border border-amber-200 text-[10px] font-bold px-1.5 py-0.2 rounded">
+      <span className="inline-flex items-center gap-0.5 bg-amber-100 text-amber-900 border border-amber-200 text-[10px] font-normal px-1.5 py-0.2 rounded">
         Confidential
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-0.5 bg-slate-100 text-slate-700 border border-slate-200 text-[10px] font-bold px-1.5 py-0.2 rounded">
+    <span className="inline-flex items-center gap-0.5 bg-slate-100 text-slate-700 border border-slate-200 text-[10px] font-normal px-1.5 py-0.2 rounded">
       Internal
     </span>
   );
@@ -357,7 +247,7 @@ function ClassificationBadge({ classification }: { classification: PersonalDataC
 function RiskBadge({ riskLevel, isHighRisk }: { riskLevel: string; isHighRisk: boolean }) {
   if (isHighRisk || riskLevel === 'High') {
     return (
-      <span className="inline-flex items-center gap-0.5 bg-rose-600 text-white text-[10px] font-extrabold px-1.5 py-0.2 rounded shadow-2xs">
+      <span className="inline-flex items-center gap-0.5 bg-rose-600 text-white text-[10px] font-normal px-1.5 py-0.2 rounded shadow-2xs">
         <AlertTriangle className="w-2.5 h-2.5" />
         High Risk
       </span>
@@ -365,13 +255,13 @@ function RiskBadge({ riskLevel, isHighRisk }: { riskLevel: string; isHighRisk: b
   }
   if (riskLevel === 'Medium') {
     return (
-      <span className="inline-flex items-center gap-0.5 bg-amber-500 text-white text-[10px] font-semibold px-1.5 py-0.2 rounded">
+      <span className="inline-flex items-center gap-0.5 bg-amber-500 text-white text-[10px] font-normal px-1.5 py-0.2 rounded">
         Medium Risk
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-0.5 bg-slate-500 text-white text-[10px] font-medium px-1.5 py-0.2 rounded">
+    <span className="inline-flex items-center gap-0.5 bg-slate-500 text-white text-[10px] font-normal px-1.5 py-0.2 rounded">
       Low Risk
     </span>
   );

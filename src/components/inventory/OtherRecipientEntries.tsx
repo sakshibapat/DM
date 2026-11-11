@@ -66,7 +66,7 @@ export const OtherRecipientEntries: React.FC<OtherRecipientEntriesProps> = ({
 
       {draft !== null && (
         <div className="w-1/2 space-y-1">
-          <label className="block text-xs font-semibold text-slate-700">{label}</label>
+          <label className={`block text-xs text-slate-700 font-bold`}>{label}</label>
           <div className="flex items-center gap-2">
             <input
               type="text"
@@ -80,7 +80,7 @@ export const OtherRecipientEntries: React.FC<OtherRecipientEntriesProps> = ({
                 }
                 if (e.key === 'Escape') onCancel();
               }}
-              className={`flex-1 min-w-0 px-3 py-2 text-xs text-slate-900 bg-white border border-slate-300 rounded-md focus:outline-none focus:ring-2 ${FOCUS_RING[accent]}`}
+              className={`flex-1 min-w-0 px-3 py-2 text-sm text-slate-900 bg-white border border-slate-300 rounded-md focus:outline-none focus:ring-2 ${FOCUS_RING[accent]}`}
             />
             <button
               type="button"

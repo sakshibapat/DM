@@ -3,7 +3,6 @@ import {
   X,
   Edit,
   Trash2,
-  Copy,
   ExternalLink,
   ShieldAlert,
   Calendar,
@@ -17,14 +16,12 @@ import {
   Lock,
   ArrowRight,
   Share2,
-  CheckCircle2,
   AlertTriangle,
   Clock,
 } from 'lucide-react';
 import { usePrivacyData } from '../../context/PrivacyDataContext';
 import { InventoryType, ProcessingActivity, TSPReference, Asset, Vendor, Entity, usesControllerWizardOptions } from '../../types/privacy';
 import { StatusBadge, ClassificationBadge, DpaStatusBadge, TagChip } from '../common/Badge';
-import { DataFlowDiagram } from '../common/DataFlowDiagram';
 import { ActivityTransferChart } from './ActivityTransferChart';
 import { destinationSafeguardLines, resolveTransferLinks } from '../../utils/destinationSafeguards';
 import { RiskWarningBanner } from '../common/RiskWarningBanner';
@@ -45,11 +42,9 @@ export const RecordDetailDrawer: React.FC<RecordDetailDrawerProps> = ({ onEditRe
     vendors,
     entities,
     deleteRecord,
-    duplicateRecord,
-    getRelatedRecords,
   } = usePrivacyData();
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'relationships' | 'governance' | 'dataFlow'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'related' | 'dataFlow' | 'flaggedRisks'>('overview');
 
   useEffect(() => {
     if (!selectedRecord) return;
@@ -59,6 +54,11 @@ export const RecordDetailDrawer: React.FC<RecordDetailDrawerProps> = ({ onEditRe
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [selectedRecord, setSelectedRecord]);
+
+  // Always open the preview on the Overview tab for a newly selected record
+  useEffect(() => {
+    setActiveTab('overview');
+  }, [selectedRecord?.id, selectedRecord?.type]);
 
   if (!selectedRecord) return null;
 
@@ -74,8 +74,6 @@ export const RecordDetailDrawer: React.FC<RecordDetailDrawerProps> = ({ onEditRe
 
   if (!record) return null;
 
-  // Calculate Bidirectional Relationships
-  const relations = getRelatedRecords(id, type);
 
   const getInventoryTitle = (invType: InventoryType) => {
     switch (invType) {
@@ -112,9 +110,6 @@ export const RecordDetailDrawer: React.FC<RecordDetailDrawerProps> = ({ onEditRe
     const gaps: { title: string; desc: string; severity: 'high' | 'medium' }[] = [];
     if (type === 'processingActivities') {
       const pa = record as ProcessingActivity;
-      if (pa.retentionPolicyType === 'None' || !pa.hasRetentionPolicy || !pa.retentionPeriod || pa.retentionPeriod === 'None') {
-        gaps.push({ title: 'No defined data retention policy.', desc: 'This processing activity operates without a formal retention schedule (GDPR Art. 5(1)(e)).', severity: 'high' });
-      }
       if (usesControllerWizardOptions(pa.role)) {
         if (!pa.legalBasis) {
           gaps.push({ title: 'Missing Legal Basis', desc: 'Art. 6 GDPR legal basis unassigned.', severity: 'high' });
@@ -156,6 +151,60 @@ export const RecordDetailDrawer: React.FC<RecordDetailDrawerProps> = ({ onEditRe
 
   const attentionGaps = getRecordAttentionGaps();
 
+  // Step 8 "Related Inventories" links for processing activities (same lists as the wizard)
+  const lookupLinked = (items: any[], ids: string[] = []) =>
+    ids.map(linkedId => items.find((x: any) => x.id === linkedId)).filter(Boolean) as any[];
+  const relatedSections: {
+    title: string;
+    icon: React.ComponentType<{ className?: string }>;
+    iconClass: string;
+    groups: { label: string | null; type: InventoryType; items: any[] }[];
+  }[] = type === 'processingActivities' ? [
+    {
+      title: 'Linked TSP products',
+      icon: Cpu,
+      iconClass: 'text-blue-600',
+      groups: [{ label: null, type: 'tspReferences', items: lookupLinked(tspReferences, record.tspIds) }],
+    },
+    {
+      title: 'Assets',
+      icon: Server,
+      iconClass: 'text-emerald-600',
+      groups: [
+        { label: 'Source', type: 'assets', items: lookupLinked(assets, record.dataSourceAssetIds) },
+        { label: 'Destinations', type: 'assets', items: lookupLinked(assets, record.dataDestinationAssetIds) },
+      ],
+    },
+    {
+      title: 'Vendors',
+      icon: Building2,
+      iconClass: 'text-amber-600',
+      groups: [{ label: null, type: 'vendors', items: lookupLinked(vendors, record.vendorIds) }],
+    },
+    {
+      title: 'Legal Entities',
+      icon: Globe2,
+      iconClass: 'text-purple-600',
+      groups: [{ label: null, type: 'entities', items: lookupLinked(entities, record.entityIds) }],
+    },
+  ] : [];
+
+  // Processing activity preview (Overview tab)
+  const paRetentionType: string = record.retentionPolicyType || (record.hasRetentionPolicy === true ? 'Custom' : 'None');
+  const paSubjectRows: { cat: string; items: string[] }[] = (record.dataSubjectCategories || []).map((cat: string) => ({
+    cat,
+    items: (record.dataSubjectPersonalDataMap?.[cat] || []) as string[],
+  }));
+  // Flagged Risks tab: restricted personal data categories (from step 3)
+  const restrictedRows: { name: string; subjects: string[] }[] = type === 'processingActivities' ? (() => {
+    const byName = new Map<string, string[]>();
+    paSubjectRows.forEach(row => row.items.forEach(item => {
+      if (getPersonalDataMetadata(item).classification !== 'Restricted') return;
+      byName.set(item, [...(byName.get(item) || []), row.cat]);
+    }));
+    return Array.from(byName.entries()).map(([name, subjects]) => ({ name, subjects }));
+  })() : [];
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-2xs sm:p-8 animate-in fade-in duration-200"
@@ -180,40 +229,12 @@ export const RecordDetailDrawer: React.FC<RecordDetailDrawerProps> = ({ onEditRe
                 {record.id}
               </span>
               <StatusBadge status={record.status} />
-              <span className="text-xs text-slate-500 font-medium">({getInventoryTitle(type)})</span>
+              <span className="text-xs text-slate-500 font-medium">{getInventoryTitle(type)}</span>
             </div>
             <h2 id="record-preview-title" className="text-lg font-bold text-slate-900 leading-snug">{record.name}</h2>
           </div>
 
           <div className="flex items-center gap-1 shrink-0">
-            <button
-              type="button"
-              onClick={() => onEditRecord(type, id)}
-              className="p-1.5 rounded-md text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 transition"
-              title="Edit Record"
-            >
-              <Edit className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => duplicateRecord(type, id)}
-              className="p-1.5 rounded-md text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 transition"
-              title="Duplicate Record"
-            >
-              <Copy className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                if (confirm(`Delete ${record.id}?`)) {
-                  deleteRecord(type, id);
-                }
-              }}
-              className="p-1.5 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition"
-              title="Delete Record"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
             <button
               type="button"
               onClick={() => setSelectedRecord(null)}
@@ -235,40 +256,21 @@ export const RecordDetailDrawer: React.FC<RecordDetailDrawerProps> = ({ onEditRe
                 : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
-            Overview & Fields
+            Overview
           </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('relationships')}
-            className={`py-3 border-b-2 transition flex items-center gap-1.5 ${
-              activeTab === 'relationships'
-                ? 'border-indigo-600 text-indigo-600 font-bold'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            Connected Lineage
-            <span className="px-1.5 py-0.2 rounded-full bg-slate-100 font-mono text-[10px] text-slate-600">
-              {relations.processingActivities.length +
-                relations.tspReferences.length +
-                relations.assets.length +
-                relations.vendors.length +
-                relations.entities.length}
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('governance')}
-            className={`py-3 border-b-2 transition flex items-center gap-1.5 ${
-              activeTab === 'governance'
-                ? 'border-indigo-600 text-indigo-600 font-bold'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            Governance & Metadata
-            {attentionGaps.length > 0 && (
-              <span className="w-2 h-2 rounded-full bg-rose-500" />
-            )}
-          </button>
+          {type === 'processingActivities' && (
+            <button
+              type="button"
+              onClick={() => setActiveTab('related')}
+              className={`py-3 border-b-2 transition flex items-center gap-1.5 ${
+                activeTab === 'related'
+                  ? 'border-indigo-600 text-indigo-600 font-bold'
+                  : 'border-transparent text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              Related Inventories
+            </button>
+          )}
           {type === 'processingActivities' && (
             <button
               type="button"
@@ -280,6 +282,19 @@ export const RecordDetailDrawer: React.FC<RecordDetailDrawerProps> = ({ onEditRe
               }`}
             >
               Data Flow
+            </button>
+          )}
+          {type === 'processingActivities' && (
+            <button
+              type="button"
+              onClick={() => setActiveTab('flaggedRisks')}
+              className={`py-3 border-b-2 transition flex items-center gap-1.5 ${
+                activeTab === 'flaggedRisks'
+                  ? 'border-indigo-600 text-indigo-600 font-bold'
+                  : 'border-transparent text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              Flagged Risks
             </button>
           )}
         </div>
@@ -295,15 +310,6 @@ export const RecordDetailDrawer: React.FC<RecordDetailDrawerProps> = ({ onEditRe
                   title={gap.title}
                   description={gap.desc}
                   severity={gap.severity}
-                  actionButton={
-                    <button
-                      type="button"
-                      onClick={() => onEditRecord(type, id)}
-                      className="text-xs px-2.5 py-1 bg-white border border-rose-300 font-semibold text-rose-800 rounded hover:bg-rose-50"
-                    >
-                      Resolve
-                    </button>
-                  }
                 />
               ))}
             </div>
@@ -311,6 +317,95 @@ export const RecordDetailDrawer: React.FC<RecordDetailDrawerProps> = ({ onEditRe
 
           {activeTab === 'overview' && (
             <div className="space-y-6 text-xs">
+              {type === 'processingActivities' && (
+                <>
+                  <div className="bg-white p-4 rounded-lg border border-slate-200 space-y-4">
+                    {record.description && (
+                      <div>
+                        <span className="block text-[11px] font-bold text-slate-900 mb-1">Description</span>
+                        <p className="text-slate-700 leading-relaxed">{record.description}</p>
+                      </div>
+                    )}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <span className="block text-[11px] font-bold text-slate-900 mb-1">Processing role</span>
+                        <span className="font-medium text-slate-800">{record.role || 'Unassigned'}</span>
+                      </div>
+                      <div>
+                        <span className="block text-[11px] font-bold text-slate-900 mb-1">Purpose for Processing</span>
+                        <span className="font-medium text-slate-800">{record.purpose || 'Unassigned'}</span>
+                      </div>
+                      <div>
+                        <span className="block text-[11px] font-bold text-slate-900 mb-1">Legal Basis</span>
+                        <span className="font-medium text-slate-800">{record.legalBasis || 'Unassigned'}</span>
+                      </div>
+                      <div>
+                        <span className="block text-[11px] font-bold text-slate-900 mb-1">Data Retention</span>
+                        <span className="font-medium text-slate-800 block">{paRetentionType}</span>
+                        {paRetentionType === 'Custom' && record.retentionPeriod ? (
+                          <span className="text-slate-700 block mt-0.5">{record.retentionPeriod}</span>
+                        ) : paRetentionType === 'None' ? (
+                          <span className="text-rose-700 block mt-0.5">No defined data retention policy.</span>
+                        ) : null}
+                      </div>
+                      <div>
+                        <span className="block text-[11px] font-bold text-slate-900 mb-1">Data Protection contact</span>
+                        <span className="font-medium text-slate-800">{record.dataProtectionContact || 'Unassigned'}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-white p-4 rounded-lg border border-slate-200 space-y-3">
+                    <span className="block text-[11px] font-bold text-slate-900">Personal data</span>
+                    {paSubjectRows.length === 0 ? (
+                      <p className="text-slate-400 italic">No data subject categories selected.</p>
+                    ) : (
+                      paSubjectRows.map(row => (
+                        <div key={row.cat} className="space-y-1.5">
+                          <span className="block font-semibold text-slate-800">{row.cat}</span>
+                          {row.items.length === 0 ? (
+                            <p className="text-slate-400 italic">No personal data categories mapped.</p>
+                          ) : (
+                            <div className="flex flex-wrap gap-1.5">
+                              {row.items.map(item => (
+                                <span
+                                  key={item}
+                                  className={`px-2 py-0.5 rounded border text-[11px] ${
+                                    getPersonalDataMetadata(item).classification === 'Restricted'
+                                      ? 'bg-rose-100 border-rose-300 text-rose-900 font-semibold'
+                                      : 'bg-slate-50 border-slate-200 text-slate-800'
+                                  }`}
+                                >
+                                  {item}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  <div className="bg-white p-4 rounded-lg border border-slate-200 space-y-2">
+                    <span className="block text-[11px] font-bold text-slate-900">Technical and Organisational Security Measures (TOMs)</span>
+                    {record.toms && record.toms.length > 0 ? (
+                      <div className="flex flex-wrap gap-1.5">
+                        {record.toms.map((tom: string) => (
+                          <span key={tom} className="px-2 py-0.5 rounded-md bg-indigo-50 border border-indigo-200 text-indigo-900 font-semibold text-[11px]">
+                            {tom}
+                            {tom === 'Other' && record.tomsOther ? ` (${record.tomsOther})` : ''}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-slate-400 italic">No TOMs documented on this record.</p>
+                    )}
+                  </div>
+                </>
+              )}
+
+              {type !== 'processingActivities' && (
+                <>
               {/* Description */}
               {record.description && (
                 <div>
@@ -595,6 +690,9 @@ export const RecordDetailDrawer: React.FC<RecordDetailDrawerProps> = ({ onEditRe
                 </div>
               )}
 
+                </>
+              )}
+
               {/* Asset Specific Overview */}
               {type === 'assets' && (
                 <div className="space-y-4">
@@ -722,7 +820,7 @@ export const RecordDetailDrawer: React.FC<RecordDetailDrawerProps> = ({ onEditRe
               )}
 
               {/* Security Controls & TSP Registration Status */}
-              {('toms' in record || 'tspStatus' in record) && (
+              {type !== 'processingActivities' && ('toms' in record || 'tspStatus' in record) && (
                 <div className="space-y-3">
                   <h4 className="font-bold uppercase text-slate-400 tracking-wider text-[10px]">
                     Technical & Organisational Security Measures (TOMs) & TSP Status
@@ -780,7 +878,7 @@ export const RecordDetailDrawer: React.FC<RecordDetailDrawerProps> = ({ onEditRe
               )}
 
               {/* Tags / Categories Chips */}
-              {record.tags && record.tags.length > 0 && (
+              {type !== 'processingActivities' && record.tags && record.tags.length > 0 && (
                 <div>
                   <h4 className="font-semibold uppercase text-slate-400 tracking-wider text-[10px] mb-1.5">
                     Categorization Tags
@@ -795,224 +893,79 @@ export const RecordDetailDrawer: React.FC<RecordDetailDrawerProps> = ({ onEditRe
             </div>
           )}
 
-          {/* TAB 2: Connected Lineage (Bidirectional Display!) */}
-          {activeTab === 'relationships' && (
+
+
+          {activeTab === 'related' && type === 'processingActivities' && (
             <div className="space-y-6 text-xs">
-              <div className="p-3 bg-indigo-50/70 border border-indigo-200 rounded-md text-indigo-950 text-xs">
-                <p className="font-semibold">Bidirectional Lineage Map</p>
-                <p className="mt-0.5 text-[11px] text-indigo-800">
-                  Showing all inventories interconnected with <strong>{record.name}</strong> ({record.id}). Clicking any record automatically opens its connected profile.
-                </p>
-              </div>
-
-              {/* Related Processing Activities */}
-              {type !== 'processingActivities' && (
-                <div className="space-y-2">
-                  <h4 className="font-bold text-slate-900 uppercase text-[10px] tracking-wider flex items-center gap-1.5">
-                    <FileText className="w-3.5 h-3.5 text-indigo-600" />
-                    Related Processing Activities ({relations.processingActivities.length})
-                  </h4>
-                  {relations.processingActivities.length === 0 ? (
-                    <p className="text-slate-400 italic">No connected processing activities.</p>
-                  ) : (
-                    <div className="space-y-1">
-                      {relations.processingActivities.map(pa => (
-                        <div
-                          key={pa.id}
-                          onClick={() => setSelectedRecord({ id: pa.id, type: 'processingActivities' })}
-                          className="p-2.5 rounded bg-white border border-slate-200 hover:border-indigo-300 transition cursor-pointer flex items-center justify-between group"
-                        >
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono text-[11px] font-bold text-slate-500">{pa.id}</span>
-                            <span className="font-semibold text-slate-800 group-hover:text-indigo-600 transition">
-                              {pa.name}
-                            </span>
+              {relatedSections.map(section => {
+                const SectionIcon = section.icon;
+                const total = section.groups.reduce((sum, g) => sum + g.items.length, 0);
+                return (
+                  <div key={section.title} className="space-y-2">
+                    <h4 className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                      <SectionIcon className={`w-3.5 h-3.5 ${section.iconClass}`} />
+                      {section.title} ({total})
+                    </h4>
+                    {section.groups.map(group => (
+                      <div key={group.label || 'items'} className="space-y-1.5">
+                        {group.label && (
+                          <span className="block text-[11px] font-semibold text-slate-600">
+                            {group.label} ({group.items.length})
+                          </span>
+                        )}
+                        {group.items.length === 0 ? (
+                          <p className="text-slate-400 italic">None linked.</p>
+                        ) : (
+                          <div className="space-y-1">
+                            {group.items.map((item: any) => (
+                              <button
+                                key={item.id}
+                                type="button"
+                                onClick={() => setSelectedRecord({ id: item.id, type: group.type })}
+                                className="w-full p-2.5 rounded bg-white border border-slate-200 hover:border-indigo-300 transition cursor-pointer flex items-center gap-2 text-left"
+                              >
+                                <span className="font-mono text-[11px] font-bold text-slate-500">{item.id}</span>
+                                <span className="font-semibold text-slate-800">{item.name}</span>
+                              </button>
+                            ))}
                           </div>
-                          <StatusBadge status={pa.status} />
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Related TSPs */}
-              {type !== 'tspReferences' && (
-                <div className="space-y-2">
-                  <h4 className="font-bold text-slate-900 uppercase text-[10px] tracking-wider flex items-center gap-1.5">
-                    <Cpu className="w-3.5 h-3.5 text-blue-600" />
-                    Related TSP Products ({relations.tspReferences.length})
-                  </h4>
-                  {relations.tspReferences.length === 0 ? (
-                    <p className="text-slate-400 italic">No connected TSP references.</p>
-                  ) : (
-                    <div className="space-y-1">
-                      {relations.tspReferences.map(tsp => (
-                        <div
-                          key={tsp.id}
-                          onClick={() => setSelectedRecord({ id: tsp.id, type: 'tspReferences' })}
-                          className="p-2.5 rounded bg-white border border-slate-200 hover:border-blue-300 transition cursor-pointer flex items-center justify-between group"
-                        >
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono text-[11px] font-bold text-slate-500">{tsp.id}</span>
-                            <span className="font-semibold text-slate-800 group-hover:text-blue-600 transition">
-                              {tsp.name}
-                            </span>
-                          </div>
-                          <span className="text-slate-500 text-[11px]">{tsp.category}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Related Assets */}
-              {type !== 'assets' && (
-                <div className="space-y-2">
-                  <h4 className="font-bold text-slate-900 uppercase text-[10px] tracking-wider flex items-center gap-1.5">
-                    <Server className="w-3.5 h-3.5 text-emerald-600" />
-                    Related Systems & Assets ({relations.assets.length})
-                  </h4>
-                  {relations.assets.length === 0 ? (
-                    <p className="text-slate-400 italic">No connected assets.</p>
-                  ) : (
-                    <div className="space-y-1">
-                      {relations.assets.map(ast => (
-                        <div
-                          key={ast.id}
-                          onClick={() => setSelectedRecord({ id: ast.id, type: 'assets' })}
-                          className="p-2.5 rounded bg-white border border-slate-200 hover:border-emerald-300 transition cursor-pointer flex items-center justify-between group"
-                        >
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono text-[11px] font-bold text-slate-500">{ast.id}</span>
-                            <span className="font-semibold text-slate-800 group-hover:text-emerald-600 transition">
-                              {ast.name}
-                            </span>
-                          </div>
-                          <ClassificationBadge classification={ast.dataClassification} />
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Related Vendors */}
-              {type !== 'vendors' && (
-                <div className="space-y-2">
-                  <h4 className="font-bold text-slate-900 uppercase text-[10px] tracking-wider flex items-center gap-1.5">
-                    <Building2 className="w-3.5 h-3.5 text-amber-600" />
-                    Related Vendors & Processors ({relations.vendors.length})
-                  </h4>
-                  {relations.vendors.length === 0 ? (
-                    <p className="text-slate-400 italic">No connected vendors.</p>
-                  ) : (
-                    <div className="space-y-1">
-                      {relations.vendors.map(v => (
-                        <div
-                          key={v.id}
-                          onClick={() => setSelectedRecord({ id: v.id, type: 'vendors' })}
-                          className="p-2.5 rounded bg-white border border-slate-200 hover:border-amber-300 transition cursor-pointer flex items-center justify-between group"
-                        >
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono text-[11px] font-bold text-slate-500">{v.id}</span>
-                            <span className="font-semibold text-slate-800 group-hover:text-amber-600 transition">
-                              {v.name}
-                            </span>
-                          </div>
-                          <DpaStatusBadge dpaStatus={v.dpaStatus} />
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Related Entities */}
-              {type !== 'entities' && (
-                <div className="space-y-2">
-                  <h4 className="font-bold text-slate-900 uppercase text-[10px] tracking-wider flex items-center gap-1.5">
-                    <Globe2 className="w-3.5 h-3.5 text-purple-600" />
-                    Related Legal Entities ({relations.entities.length})
-                  </h4>
-                  {relations.entities.length === 0 ? (
-                    <p className="text-slate-400 italic">No connected legal entities.</p>
-                  ) : (
-                    <div className="space-y-1">
-                      {relations.entities.map(e => (
-                        <div
-                          key={e.id}
-                          onClick={() => setSelectedRecord({ id: e.id, type: 'entities' })}
-                          className="p-2.5 rounded bg-white border border-slate-200 hover:border-purple-300 transition cursor-pointer flex items-center justify-between group"
-                        >
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono text-[11px] font-bold text-slate-500">{e.id}</span>
-                            <span className="font-semibold text-slate-800 group-hover:text-purple-600 transition">
-                              {e.name}
-                            </span>
-                          </div>
-                          <span className="text-slate-600 font-medium text-[11px]">{e.jurisdiction}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
             </div>
           )}
 
-          {/* TAB 3: Governance & Audit Metadata */}
-          {activeTab === 'governance' && (
+          {activeTab === 'flaggedRisks' && type === 'processingActivities' && (
             <div className="space-y-6 text-xs">
-              {/* TOMs list for PAs */}
-              {type === 'processingActivities' && (
+              <div className="bg-white p-4 rounded-lg border border-slate-200 space-y-4">
+                <h4 className="font-bold text-slate-900 text-xs">Personal data</h4>
                 <div>
-                  <h4 className="font-bold text-slate-900 uppercase text-[10px] tracking-wider mb-2">
-                    Technical & Organizational Security Measures (TOMs)
-                  </h4>
-                  {(!record.toms || record.toms.length === 0) ? (
-                    <p className="text-rose-600 italic font-medium">No TOMs security safeguards assigned yet!</p>
+                  <span className="block text-[11px] font-bold text-slate-900 mb-1">Restricted categories of data</span>
+                  {restrictedRows.length === 0 ? (
+                    <p className="text-slate-400 italic">No restricted categories of data selected.</p>
                   ) : (
-                    <div className="space-y-1">
-                      {record.toms.map((tom: string) => (
-                        <div key={tom} className="p-2 rounded bg-slate-50 border border-slate-200 flex items-center gap-2">
-                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                          <span className="font-medium text-slate-800">{tom}</span>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-1.5">
+                      {restrictedRows.map(row => (
+                        <div key={row.name} className="flex items-center justify-between gap-3 p-2.5 rounded border border-rose-300 bg-rose-50">
+                          <span className="font-semibold text-rose-900">{row.name}</span>
+                          <span className="text-[11px] text-rose-800 text-right">{row.subjects.join(', ')}</span>
                         </div>
                       ))}
                     </div>
                   )}
                 </div>
-              )}
-
-              {/* System Audit Information */}
-              <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 space-y-3">
-                <h4 className="font-bold text-slate-900 uppercase text-[10px] tracking-wider">
-                  System Audit Metadata
-                </h4>
-                <div className="grid grid-cols-2 gap-3 text-slate-600">
-                  <div>
-                    <span className="text-[10px] uppercase font-semibold text-slate-400 block">Created Date</span>
-                    <span>{new Date(record.createdDate).toLocaleDateString()}</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] uppercase font-semibold text-slate-400 block">Created By</span>
-                    <span className="font-mono text-[11px] text-slate-700">{record.createdBy}</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] uppercase font-semibold text-slate-400 block">Last Modified</span>
-                    <span>{new Date(record.lastModifiedDate).toLocaleDateString()}</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] uppercase font-semibold text-slate-400 block">Modified By</span>
-                    <span className="font-mono text-[11px] text-slate-700">{record.lastModifiedBy}</span>
-                  </div>
-                </div>
               </div>
+              {paRetentionType === 'None' && (
+                <div className="bg-white p-4 rounded-lg border border-rose-300 space-y-2">
+                  <h4 className="font-bold text-slate-900 text-xs">Data retention status</h4>
+                  <p className="text-rose-700 font-medium">No defined data retention policy.</p>
+                </div>
+              )}
             </div>
           )}
-
           {activeTab === 'dataFlow' && type === 'processingActivities' && (
             <div className="space-y-6">
               <ActivityTransferChart
@@ -1021,7 +974,6 @@ export const RecordDetailDrawer: React.FC<RecordDetailDrawerProps> = ({ onEditRe
                 destinationAssetIds={record.dataDestinationAssetIds || []}
                 links={resolveTransferLinks(record)}
               />
-              <DataFlowDiagram processingActivityId={id} />
             </div>
           )}
         </div>
@@ -1036,14 +988,31 @@ export const RecordDetailDrawer: React.FC<RecordDetailDrawerProps> = ({ onEditRe
             Close
           </button>
 
-          <button
-            type="button"
-            onClick={() => onEditRecord(type, id)}
-            className="px-4 py-1.5 rounded bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 flex items-center gap-1.5"
-          >
-            <Edit className="w-3.5 h-3.5" />
-            Edit Record
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                if (confirm(`Delete ${record.id} permanently? This cannot be undone.`)) {
+                  deleteRecord(type, id);
+                }
+              }}
+              className="px-4 py-1.5 rounded bg-rose-600 text-white text-xs font-semibold hover:bg-rose-700 flex items-center gap-1.5"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              Delete Record
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+              setSelectedRecord(null);
+              onEditRecord(type, id);
+            }}
+              className="px-4 py-1.5 rounded bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 flex items-center gap-1.5"
+            >
+              <Edit className="w-3.5 h-3.5" />
+              Edit Record
+            </button>
+          </div>
         </div>
       </div>
     </div>

@@ -185,7 +185,7 @@ export const ActivityTransferChart: React.FC<ActivityTransferChartProps> = ({
   if (!source) {
     return (
       <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center">
-        <p className="text-xs font-semibold text-slate-600">Choose a source asset to map the transfer direction.</p>
+        <p className="text-xs font-normal text-slate-600">Choose a source asset to map the transfer direction.</p>
       </div>
     );
   }
@@ -194,9 +194,6 @@ export const ActivityTransferChart: React.FC<ActivityTransferChartProps> = ({
     <div className="space-y-3">
       <div>
         <h4 className="text-xs font-bold text-slate-900">Data Flow Diagram</h4>
-        <p className="text-[11px] text-slate-500 mt-0.5">
-          Choose each destination's source above. The chart shows those transfers, and each asset shows its hosting location.
-        </p>
       </div>
       <div className="h-[420px] overflow-hidden rounded-xl border border-slate-200" style={{ backgroundColor: chartBackground }}>
         <ReactFlow
@@ -219,6 +216,17 @@ export const ActivityTransferChart: React.FC<ActivityTransferChartProps> = ({
           <Background gap={16} size={1} color="#EDE6DA" bgColor={chartBackground} />
           <Controls showInteractive={false} />
         </ReactFlow>
+      </div>
+      <div className="flex flex-wrap items-center gap-4 text-[11px] text-slate-700">
+        <span className="font-semibold text-slate-900">Key</span>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block w-3.5 h-3.5 rounded-sm border-[3px]" style={{ borderColor: '#6366f1', backgroundColor: '#eef2ff' }} />
+          Source asset
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block w-3.5 h-3.5 rounded-sm border-[3px]" style={{ borderColor: '#10b981', backgroundColor: '#ecfdf5' }} />
+          Destination asset
+        </span>
       </div>
     </div>
   );
