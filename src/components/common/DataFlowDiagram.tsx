@@ -316,7 +316,7 @@ export const DataFlowDiagram: React.FC<DataFlowDiagramProps> = ({ processingActi
         <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
           <h4 className="font-bold text-slate-800 text-[10px] uppercase tracking-wider flex items-center gap-1.5">
             <Cpu className="w-3.5 h-3.5 text-blue-600" />
-            TSP / Product References
+            TSP Products
           </h4>
           <div className="space-y-1.5">
             {linkedTsp.length === 0 ? (

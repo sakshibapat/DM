@@ -31,7 +31,7 @@ export const Sidebar: React.FC = () => {
     },
     {
       id: 'tspReferences',
-      label: 'TSP / Product Ref',
+      label: 'TSP Products',
       icon: Cpu,
       accent: 'text-blue-600',
     },

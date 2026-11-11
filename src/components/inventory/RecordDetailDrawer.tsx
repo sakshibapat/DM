@@ -82,7 +82,7 @@ export const RecordDetailDrawer: React.FC<RecordDetailDrawerProps> = ({ onEditRe
       case 'processingActivities':
         return 'Processing Activity';
       case 'tspReferences':
-        return 'TSP / Product Ref';
+        return 'TSP Product';
       case 'assets':
         return 'Asset / System';
       case 'vendors':
@@ -841,7 +841,7 @@ export const RecordDetailDrawer: React.FC<RecordDetailDrawerProps> = ({ onEditRe
                 <div className="space-y-2">
                   <h4 className="font-bold text-slate-900 uppercase text-[10px] tracking-wider flex items-center gap-1.5">
                     <Cpu className="w-3.5 h-3.5 text-blue-600" />
-                    Related TSP / Product References ({relations.tspReferences.length})
+                    Related TSP Products ({relations.tspReferences.length})
                   </h4>
                   {relations.tspReferences.length === 0 ? (
                     <p className="text-slate-400 italic">No connected TSP references.</p>

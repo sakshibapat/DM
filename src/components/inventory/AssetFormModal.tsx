@@ -766,7 +766,7 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
           {activeTab === 'relationships' && (
             <div className="space-y-6 animate-in fade-in duration-150">
               <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-900 leading-relaxed">
-                Establish bidirectional links to Processing Activities, Vendors, and TSP/Product references. Relationships are synchronized automatically across all linked inventories.
+                Establish bidirectional links to Processing Activities, Vendors, and TSP Products. Relationships are synchronized automatically across all linked inventories.
               </div>
 
               {/* Related Processing Activities */}
@@ -789,9 +789,9 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
                 helperText="Third-party vendor entities maintaining or operating this asset infrastructure."
               />
 
-              {/* Related TSP / Product References */}
+              {/* Related TSP Products */}
               <SearchableRelationshipSelector
-                label="Related TSP / Product References"
+                label="Related TSP Products"
                 targetInventoryType="tspReferences"
                 availableItems={tspReferences}
                 selectedIds={tspIds}

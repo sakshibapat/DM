@@ -59,7 +59,9 @@ import { TextField } from '../common/TextField';
 import { Select } from '../common/Select';
 import { MultiSelect } from '../common/MultiSelect';
 import { SearchableRelationshipSelector } from '../common/SearchableRelationshipSelector';
+import { SearchableSelect } from '../common/SearchableSelect';
 import { DataSubjectPersonalDataCard } from './DataSubjectPersonalDataCard';
+import { OtherRecipientEntries } from './OtherRecipientEntries';
 import { RiskWarningBanner } from '../common/RiskWarningBanner';
 import {
   DATA_SUBJECT_CATEGORIES,
@@ -95,6 +97,21 @@ const selectedRetentionType = (
   if (data.hasRetentionPolicy === true) return 'Custom';
   if (data.hasRetentionPolicy === false) return 'None';
   return undefined;
+};
+
+const OTHER_TRIMBLE_TEAM = 'Other Trimble Product Team';
+const OTHER_THIRD_PARTY = 'Other Third Party';
+
+// Saved "Other" entries are stored as arrays; the comma-joined text fields stay in sync for readers.
+const otherRecipientFields = (data: Partial<ProcessingActivity>) => {
+  const teams = data.specifiedTrimbleProductTeams || [];
+  const thirdParties = data.specifiedThirdParties || [];
+  return {
+    specifiedTrimbleProductTeams: teams,
+    specifiedThirdParties: thirdParties,
+    specifiedTrimbleProductTeam: teams.join(', '),
+    specifiedThirdParty: thirdParties.join(', '),
+  };
 };
 
 const viewForSafeguard = (value: string): SafeguardView => {
@@ -217,12 +234,16 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
     category: string;
     itemCount: number;
   } | null>(null);
-  const [revealedDataSubject, setRevealedDataSubject] = useState<string | null>(null);
+
+  // Draft text for a new "Other" entry: null = input closed, string = input open
+  const [trimbleTeamDraft, setTrimbleTeamDraft] = useState<string | null>(null);
+  const [thirdPartyDraft, setThirdPartyDraft] = useState<string | null>(null);
 
   // Populate form if editing
   useEffect(() => {
-    setRevealedDataSubject(null);
     statusBeforeArchive.current = '';
+    setTrimbleTeamDraft(null);
+    setThirdPartyDraft(null);
     if (isEdit && recordIdToEdit) {
       const existing = processingActivities.find(x => x.id === recordIdToEdit);
       if (existing) {
@@ -288,8 +309,10 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
           personalDataCategories: allPersonalData,
           involvesHighRiskData: hasHighRisk || Boolean(existing.involvesHighRiskData),
           recipientCategories: recipients,
-          specifiedTrimbleProductTeam: existing.specifiedTrimbleProductTeam || '',
-          specifiedThirdParty: existing.specifiedThirdParty || '',
+          specifiedTrimbleProductTeams: existing.specifiedTrimbleProductTeams
+            || (existing.specifiedTrimbleProductTeam ? [existing.specifiedTrimbleProductTeam] : []),
+          specifiedThirdParties: existing.specifiedThirdParties
+            || (existing.specifiedThirdParty ? [existing.specifiedThirdParty] : []),
           hasInternationalTransfer: transferStatus,
           selectedTransferRegions: transferRegions,
           internationalTransferDetails: transferDetails,
@@ -328,8 +351,8 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
         dataSubjectCategories: [],
         dataSubjectPersonalDataMap: {},
         recipientCategories: [],
-        specifiedTrimbleProductTeam: '',
-        specifiedThirdParty: '',
+        specifiedTrimbleProductTeams: [],
+        specifiedThirdParties: [],
         selectedTransferRegions: [],
         internationalTransferDetails: [],
         tspIds: [],
@@ -395,7 +418,6 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
       personalDataCategories: allSelected,
       involvesHighRiskData: hasHighRisk,
     }));
-    setRevealedDataSubject(categoryName);
   };
 
   const executeRemoveDataSubjectCategory = (categoryName: string) => {
@@ -447,6 +469,45 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
       ...prev,
       recipientCategories: updated,
     }));
+  };
+
+  // "Other" recipient checkboxes open a new entry input instead of toggling a single value
+  const isRecipientChecked = (categoryName: string) => {
+    if (categoryName === OTHER_TRIMBLE_TEAM) {
+      return (formData.specifiedTrimbleProductTeams?.length || 0) > 0 || trimbleTeamDraft !== null;
+    }
+    if (categoryName === OTHER_THIRD_PARTY) {
+      return (formData.specifiedThirdParties?.length || 0) > 0 || thirdPartyDraft !== null;
+    }
+    return Boolean(formData.recipientCategories?.includes(categoryName));
+  };
+
+  const handleRecipientClick = (categoryName: string) => {
+    if (categoryName === OTHER_TRIMBLE_TEAM) {
+      setTrimbleTeamDraft(draft => (draft === null ? '' : null));
+      return;
+    }
+    if (categoryName === OTHER_THIRD_PARTY) {
+      setThirdPartyDraft(draft => (draft === null ? '' : null));
+      return;
+    }
+    handleToggleRecipientCategory(categoryName);
+  };
+
+  // Adds or removes saved "Other" entries and keeps the category in recipientCategories in sync
+  const updateOtherEntries = (
+    categoryName: string,
+    listKey: 'specifiedTrimbleProductTeams' | 'specifiedThirdParties',
+    update: (entries: string[]) => string[]
+  ) => {
+    setFormData(prev => {
+      const entries = update((prev[listKey] as string[] | undefined) || []);
+      const current = prev.recipientCategories || [];
+      const nextCategories = entries.length > 0
+        ? (current.includes(categoryName) ? current : [...current, categoryName])
+        : current.filter(c => c !== categoryName);
+      return { ...prev, [listKey]: entries, recipientCategories: nextCategories };
+    });
   };
 
   const sourceAssetId = formData.dataSourceAssetIds?.[0] || '';
@@ -762,7 +823,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
     }
 
     // Step 4: Categories of Recipients
-    if (formData.recipientCategories?.includes('Other Trimble Product Team') && !formData.specifiedTrimbleProductTeam?.trim()) {
+    if (formData.recipientCategories?.includes(OTHER_TRIMBLE_TEAM) && (formData.specifiedTrimbleProductTeams?.length || 0) === 0) {
       errors.push({
         id: 'err-spec-team',
         type: 'ERROR',
@@ -773,7 +834,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
         description: 'Specify the specific internal Trimble Product Team entity.',
       });
     }
-    if (formData.recipientCategories?.includes('Other Third Party') && !formData.specifiedThirdParty?.trim()) {
+    if (formData.recipientCategories?.includes(OTHER_THIRD_PARTY) && (formData.specifiedThirdParties?.length || 0) === 0) {
       errors.push({
         id: 'err-spec-tp',
         type: 'ERROR',
@@ -837,7 +898,10 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
 
     // Step 6: Data Retention
     const retentionType = selectedRetentionType(formData);
-    if (retentionType !== 'Custom' || formData.retentionPeriod === 'None' || !formData.retentionPeriod?.trim()) {
+    if (
+      retentionType !== 'None' &&
+      (retentionType !== 'Custom' || formData.retentionPeriod === 'None' || !formData.retentionPeriod?.trim())
+    ) {
       warnings.push({
         id: 'warn-retention-none',
         type: 'WARNING',
@@ -961,6 +1025,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
   const handleSaveAndClose = () => {
     const payload = {
       ...formData,
+      ...otherRecipientFields(formData),
       status: statusForSaveAndClose(),
       name: formData.name?.trim() || 'Untitled Processing Activity (Draft)',
     };
@@ -988,6 +1053,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
 
     const payload = {
       ...formData,
+      ...otherRecipientFields(formData),
       status: 'Published' as StatusType,
     };
 
@@ -1182,13 +1248,6 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                   {roleOptions.map(roleValue => {
                     const roleVal = roleValue as ProcessingRole;
                     const isSelected = formData.role === roleVal;
-                    const subtitle = roleValue === 'Controller'
-                      ? 'Determines the purposes and means of processing personal data.'
-                      : roleValue === 'Processor (B2B sales only)'
-                      ? 'Processes data on behalf of business customers under contract.'
-                      : roleValue === 'Processor (but including B2C sales)'
-                      ? 'Processes consumer or mixed business data on behalf of clients.'
-                      : 'Configured processing role.';
                     return (
                       <button
                         key={roleValue}
@@ -1211,7 +1270,6 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                               {isSelected && <Check className="w-2.5 h-2.5" />}
                             </div>
                           </div>
-                          <p className="text-[11px] text-slate-500 leading-relaxed">{subtitle}</p>
                         </div>
                       </button>
                     );
@@ -1443,11 +1501,6 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                               </span>
                             )}
                           </div>
-                          <p className="text-[11px] text-slate-500 mt-0.5">
-                            {cat.includes('Customer')
-                              ? 'End-user consumer accounts, prospects, leads, and clients'
-                              : 'Internal workforce, staff candidates, contractors, and HR applicants'}
-                          </p>
                         </div>
                       </button>
                     );
@@ -1519,11 +1572,6 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                       availableDataItems={configuredPersonalDataItems}
                       onChangeDataItems={newItems => handleUpdateItemsForSubjectCategory(cat, newItems)}
                       onRemoveSubjectCategory={() => handleToggleDataSubjectCategory(cat)}
-                      reveal={
-                        revealedDataSubject
-                          ? revealedDataSubject === cat
-                          : cat === formData.dataSubjectCategories?.[0]
-                      }
                     />
                   ))
                 )}
@@ -1558,7 +1606,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
                   {internalRecipientOptions.map(cat => {
-                    const isChecked = formData.recipientCategories?.includes(cat);
+                    const isChecked = isRecipientChecked(cat);
                     return (
                       <label
                         key={cat}
@@ -1571,7 +1619,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                         <input
                           type="checkbox"
                           checked={Boolean(isChecked)}
-                          onChange={() => handleToggleRecipientCategory(cat)}
+                          onChange={() => handleRecipientClick(cat)}
                           className="mt-0.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                         />
                         <span className="leading-tight">{cat}</span>
@@ -1580,20 +1628,27 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                   })}
                 </div>
 
-                {/* Conditional Field for "Other Trimble Product Team" */}
-                {formData.recipientCategories?.includes('Other Trimble Product Team') && (
-                  <div className="pt-2 animate-in fade-in duration-150">
-                    <TextField
-                      label="Please specify the Trimble Product Team"
-                      placeholder="e.g., Trimble Connect, Trimble Tekla, Trimble Quadri"
-                      value={formData.specifiedTrimbleProductTeam || ''}
-                      onChange={e =>
-                        setFormData({ ...formData, specifiedTrimbleProductTeam: e.target.value })
-                      }
-                      required
-                    />
-                  </div>
-                )}
+                {/* Saved entries and input for "Other Trimble Product Team" */}
+                <OtherRecipientEntries
+                  label="Please specify the Trimble Product Team"
+                  placeholder="e.g., Trimble Connect, Trimble Tekla, Trimble Quadri"
+                  accent="indigo"
+                  entries={formData.specifiedTrimbleProductTeams || []}
+                  draft={trimbleTeamDraft}
+                  onDraftChange={value => setTrimbleTeamDraft(value)}
+                  onCommit={() => {
+                    const value = (trimbleTeamDraft || '').trim();
+                    if (!value) return;
+                    updateOtherEntries(OTHER_TRIMBLE_TEAM, 'specifiedTrimbleProductTeams', entries => [...entries, value]);
+                    setTrimbleTeamDraft(null);
+                  }}
+                  onCancel={() => setTrimbleTeamDraft(null)}
+                  onRemove={index =>
+                    updateOtherEntries(OTHER_TRIMBLE_TEAM, 'specifiedTrimbleProductTeams', entries =>
+                      entries.filter((_, i) => i !== index)
+                    )
+                  }
+                />
               </div>
 
               {/* Group 2: External */}
@@ -1614,7 +1669,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                   {externalRecipientOptions.map(cat => {
-                    const isChecked = formData.recipientCategories?.includes(cat);
+                    const isChecked = isRecipientChecked(cat);
                     return (
                       <label
                         key={cat}
@@ -1627,7 +1682,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                         <input
                           type="checkbox"
                           checked={Boolean(isChecked)}
-                          onChange={() => handleToggleRecipientCategory(cat)}
+                          onChange={() => handleRecipientClick(cat)}
                           className="mt-0.5 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
                         />
                         <span className="leading-tight">{cat}</span>
@@ -1636,20 +1691,27 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                   })}
                 </div>
 
-                {/* Conditional Field for "Other Third Party" */}
-                {formData.recipientCategories?.includes('Other Third Party') && (
-                  <div className="pt-2 animate-in fade-in duration-150">
-                    <TextField
-                      label="Please specify the Third Party"
-                      placeholder="e.g., External Legal Counsel, Statutory Tax Authorities"
-                      value={formData.specifiedThirdParty || ''}
-                      onChange={e =>
-                        setFormData({ ...formData, specifiedThirdParty: e.target.value })
-                      }
-                      required
-                    />
-                  </div>
-                )}
+                {/* Saved entries and input for "Other Third Party" */}
+                <OtherRecipientEntries
+                  label="Please specify the Third Party"
+                  placeholder="e.g., External Legal Counsel, Statutory Tax Authorities"
+                  accent="amber"
+                  entries={formData.specifiedThirdParties || []}
+                  draft={thirdPartyDraft}
+                  onDraftChange={value => setThirdPartyDraft(value)}
+                  onCommit={() => {
+                    const value = (thirdPartyDraft || '').trim();
+                    if (!value) return;
+                    updateOtherEntries(OTHER_THIRD_PARTY, 'specifiedThirdParties', entries => [...entries, value]);
+                    setThirdPartyDraft(null);
+                  }}
+                  onCancel={() => setThirdPartyDraft(null)}
+                  onRemove={index =>
+                    updateOtherEntries(OTHER_THIRD_PARTY, 'specifiedThirdParties', entries =>
+                      entries.filter((_, i) => i !== index)
+                    )
+                  }
+                />
 
                 {/* Conditional Vendor Inventory Linker for "Third Party Vendors" */}
                 {formData.recipientCategories?.includes('Third Party Vendors') && (
@@ -1685,13 +1747,13 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
               </div>
 
               <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-4">
-                <Select
+                <SearchableSelect
                   label="What is the source asset/system?"
                   options={[...assets]
                     .sort((a, b) => a.name.localeCompare(b.name))
                     .map(asset => ({ value: asset.id, label: `${asset.name} (${asset.id})` }))}
                   value={sourceAssetId}
-                  onChange={event => handleSourceAssetChange(event.target.value)}
+                  onChange={value => handleSourceAssetChange(value)}
                   placeholder="Select a source asset or system"
                 />
                 {sourceAsset && (
@@ -1782,13 +1844,12 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                       <div key={assetId} className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-4">
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0 flex-1">
-                            <Select
+                            <SearchableSelect
                               id={`destination-asset-${assetId}`}
                               label="What is the destination asset/system?"
                               options={destinationOptions}
                               value={assetId}
-                              onChange={event => {
-                                const nextId = event.target.value;
+                              onChange={nextId => {
                                 if (!nextId) {
                                   removeDestinationAsset(assetId);
                                   return;
@@ -1807,12 +1868,12 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
-                        <Select
+                        <SearchableSelect
                           id={`destination-source-${assetId}`}
                           label="What is the source asset/system for this transfer?"
                           options={sourceOptions}
                           value={selectedTransferSource}
-                          onChange={event => setDestinationSource(assetId, event.target.value)}
+                          onChange={value => setDestinationSource(assetId, value)}
                           placeholder="Select a source asset or system"
                           helperText="Choose the source asset, or a destination already added on this screen."
                         />
@@ -1866,13 +1927,12 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                       <div key={blankKey} className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-4">
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0 flex-1">
-                            <Select
+                            <SearchableSelect
                               id={`destination-asset-${blankKey}`}
                               label="What is the destination asset/system?"
                               options={destinationOptions}
                               value=""
-                              onChange={event => {
-                                const nextId = event.target.value;
+                              onChange={nextId => {
                                 if (!nextId) return;
                                 addDestinationAsset(nextId);
                                 setBlankDestinationKeys(keys => keys.filter(key => key !== blankKey));
@@ -1979,9 +2039,6 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                       </div>
                       <div>
                         <span className="font-bold text-xs text-slate-900 block">Custom Retention Schedule</span>
-                        <span className="text-[11px] text-slate-500 block mt-0.5">
-                          Specific retention timeframe or deletion criteria documented.
-                        </span>
                       </div>
                     </button>
 
@@ -2014,9 +2071,6 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                       </div>
                       <div>
                         <span className="font-bold text-xs text-slate-900 block">None (No Defined Policy)</span>
-                        <span className="text-[11px] text-slate-500 block mt-0.5">
-                          No retention schedule established; generates compliance risk warning.
-                        </span>
                       </div>
                     </button>
                   </div>
@@ -2046,20 +2100,6 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                     </div>
                   )}
 
-                  {/* None Option: Red Risk Indicator */}
-                  {selectedRetentionType(formData) === 'None' && (
-                    <div className="p-3.5 rounded-lg bg-rose-50 border border-rose-300 text-rose-900 flex items-start gap-3 animate-in fade-in duration-150">
-                      <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
-                      <div>
-                        <span className="font-bold text-xs block text-rose-950">
-                          No defined data retention policy.
-                        </span>
-                        <p className="text-[11px] text-rose-800 mt-0.5">
-                          This processing activity record can be saved as a draft, but operating without a retention policy violates data minimization rules (GDPR Art. 5(1)(e)).
-                        </p>
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
             </div>
@@ -2085,6 +2125,10 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                 onTspJustificationChange={justification => setFormData(prev => ({ ...prev, tspJustification: justification }))}
                 onTomsChange={toms => setFormData(prev => ({ ...prev, toms }))}
                 onTomsOtherChange={other => setFormData(prev => ({ ...prev, tomsOther: other }))}
+                tspRecords={tspReferences}
+                selectedTspRecordIds={formData.tspIds || []}
+                onTspRecordIdsChange={ids => setFormData(prev => ({ ...prev, tspIds: ids }))}
+                showScopeNotice={false}
               />
             </div>
           )}
@@ -2100,7 +2144,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
 
               <div className="space-y-4">
                 <SearchableRelationshipSelector
-                  label="Linked TSP / Product References"
+                  label="Linked TSP Products"
                   targetInventoryType="tspReferences"
                   availableItems={tspReferences}
                   selectedIds={formData.tspIds || []}

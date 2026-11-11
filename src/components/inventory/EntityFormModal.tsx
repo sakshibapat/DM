@@ -400,7 +400,7 @@ export const EntityFormModal: React.FC<EntityFormModalProps> = ({
 
               {/* Connected TSPs */}
               <SearchableRelationshipSelector
-                label="Related TSP / Product References"
+                label="Related TSP Products"
                 targetInventoryType="tspReferences"
                 availableItems={tspReferences}
                 selectedIds={tspIds}

@@ -46,7 +46,7 @@ export const SearchableRelationshipSelector: React.FC<SearchableRelationshipSele
       case 'processingActivities':
         return 'Processing Activity';
       case 'tspReferences':
-        return 'TSP / Product Ref';
+        return 'TSP Product';
       case 'assets':
         return 'Asset';
       case 'vendors':
@@ -124,21 +124,21 @@ export const SearchableRelationshipSelector: React.FC<SearchableRelationshipSele
         <div className="flex items-center gap-1.5 ml-auto">
           <button
             type="button"
+            onClick={() => setIsOpen(!isOpen)}
+            className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded bg-slate-900 text-white font-medium hover:bg-slate-800 transition"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            {isOpen ? 'Close' : 'Link / Manage'}
+          </button>
+
+          <button
+            type="button"
             onClick={() => setIsQuickCreateOpen(true)}
             className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 font-medium hover:bg-slate-200 transition border border-slate-300"
             title={`Create a new ${getInventoryTitle(targetInventoryType)} record without leaving current form`}
           >
             <Sparkles className="w-3 h-3 text-indigo-600" />
             + New {getInventoryTitle(targetInventoryType)}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setIsOpen(!isOpen)}
-            className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded bg-slate-900 text-white font-medium hover:bg-slate-800 transition"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            {isOpen ? 'Close' : 'Link / Manage'}
           </button>
         </div>
       </div>

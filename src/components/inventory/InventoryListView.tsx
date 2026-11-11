@@ -259,7 +259,7 @@ export const InventoryListView: React.FC<InventoryListViewProps> = ({
         };
       case 'tspReferences':
         return {
-          title: 'TSP / Product References',
+          title: 'TSP Products',
           description: 'Inventory of technology service provider architectures, SaaS engines, and cloud software platforms.',
           icon: Cpu,
           accent: 'text-blue-600',
@@ -414,7 +414,7 @@ export const InventoryListView: React.FC<InventoryListViewProps> = ({
         matchesEntity = record.entityIds && record.entityIds.includes(filterEntity);
       }
 
-      // 12. TSP / Product Reference Filter
+      // 12. TSP Product Filter
       let matchesTSP = true;
       if (filterTSP !== 'all') {
         matchesTSP = record.tspIds && record.tspIds.includes(filterTSP);

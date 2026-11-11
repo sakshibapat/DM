@@ -37,7 +37,7 @@ export const QuickCreateRecordModal: React.FC<QuickCreateRecordModalProps> = ({
       case 'processingActivities':
         return 'Processing Activity';
       case 'tspReferences':
-        return 'TSP / Product Reference';
+        return 'TSP Product';
       case 'assets':
         return 'System & Asset';
       case 'vendors':

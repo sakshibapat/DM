@@ -151,8 +151,10 @@ export interface ProcessingActivity extends BaseRecord {
 
   // Recipients
   recipientCategories?: string[];
-  specifiedTrimbleProductTeam?: string;
-  specifiedThirdParty?: string;
+  specifiedTrimbleProductTeams?: string[]; // Saved "Other Trimble Product Team" entries
+  specifiedThirdParties?: string[]; // Saved "Other Third Party" entries
+  specifiedTrimbleProductTeam?: string; // Comma-joined copy of specifiedTrimbleProductTeams (kept for readers)
+  specifiedThirdParty?: string; // Comma-joined copy of specifiedThirdParties (kept for readers)
 
   // International Transfers
   hasInternationalTransfer?: InternationalTransferStatus;
@@ -175,7 +177,7 @@ export interface ProcessingActivity extends BaseRecord {
   entityIds: string[];
 }
 
-// 2. TSP / Product Reference Record (Technical / Service Provider or Product Reference)
+// 2. TSP Product Record (Technical / Service Provider or Product Reference)
 export interface TSPReference extends BaseRecord {
   category: string; // e.g. "SaaS Platform", "Infrastructure Provider", "Database Engine", "Analytics Service"
   versionOrPlan?: string;

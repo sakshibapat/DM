@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
   Users,
   Briefcase,
@@ -21,7 +21,6 @@ interface DataSubjectPersonalDataCardProps {
   availableDataItems?: readonly string[];
   onChangeDataItems: (newItems: string[]) => void;
   onRemoveSubjectCategory: () => void;
-  reveal?: boolean;
 }
 
 export const DataSubjectPersonalDataCard: React.FC<DataSubjectPersonalDataCardProps> = ({
@@ -30,23 +29,10 @@ export const DataSubjectPersonalDataCard: React.FC<DataSubjectPersonalDataCardPr
   availableDataItems = CONTROLLED_PERSONAL_DATA_ITEMS,
   onChangeDataItems,
   onRemoveSubjectCategory,
-  reveal = false,
 }) => {
   const listRef = useRef<HTMLDivElement>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [classificationFilter, setClassificationFilter] = useState<'All' | 'High Risk' | PersonalDataClassification>('All');
-
-  useEffect(() => {
-    if (!reveal || !listRef.current) return;
-    const node = listRef.current;
-    const frame = requestAnimationFrame(() => {
-      const scroller = node.closest('form');
-      if (!scroller) return;
-      const top = node.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop;
-      scroller.scrollTo({ top: Math.max(0, top - 8), behavior: 'smooth' });
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [reveal, subjectCategory]);
 
   // Choose icon based on category name
   const getSubjectIcon = (cat: string) => {

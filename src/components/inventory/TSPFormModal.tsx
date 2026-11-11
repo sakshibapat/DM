@@ -191,7 +191,7 @@ export const TSPFormModal: React.FC<TSPFormModalProps> = ({
             </div>
             <div>
               <h2 className="text-lg font-bold text-slate-900">
-                {isEdit ? `Edit TSP / Product Reference: ${name}` : 'Register New TSP / Product Reference'}
+                {isEdit ? `Edit TSP Product: ${name}` : 'Register New TSP Product'}
               </h2>
               <p className="text-xs text-slate-500">
                 Register software products, cloud services, and technical service provider references.
@@ -260,7 +260,7 @@ export const TSPFormModal: React.FC<TSPFormModalProps> = ({
                   <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
                   <div>
                     <span className="font-bold text-amber-950 block">Potential Duplicate Record Warning</span>
-                    A record named <strong>"{duplicateMatch.name}"</strong> (ID: <code>{duplicateMatch.id}</code>) already exists in TSP / Product References. Please verify you are not creating a redundant duplicate.
+                    A record named <strong>"{duplicateMatch.name}"</strong> (ID: <code>{duplicateMatch.id}</code>) already exists in TSP Products. Please verify you are not creating a redundant duplicate.
                   </div>
                 </div>
               )}
@@ -285,7 +285,7 @@ export const TSPFormModal: React.FC<TSPFormModalProps> = ({
 
                 <div>
                   <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1">
-                    TSP / Product Reference ID
+                    TSP Product ID
                   </label>
                   <input
                     type="text"
@@ -406,7 +406,7 @@ export const TSPFormModal: React.FC<TSPFormModalProps> = ({
           {activeTab === 'relationships' && (
             <div className="space-y-6 animate-in fade-in duration-150">
               <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-900 leading-relaxed">
-                Connect this TSP / Product reference to associated Assets, Processing Activities, and Vendors. Relationships update automatically in both directions.
+                Connect this TSP Product to associated Assets, Processing Activities, and Vendors. Relationships update automatically in both directions.
               </div>
 
               {/* Connected Assets */}

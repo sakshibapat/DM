@@ -105,7 +105,7 @@ export const DEFAULT_INVENTORY_CONFIG: InventoryConfigDocument = {
       },
     },
     tspReferences: {
-      displayName: 'TSP / Product References',
+      displayName: 'TSP Products',
       optionGroups: {
         statuses: group('statuses', 'Approval Statuses', 'Record lifecycle statuses.', STATUSES),
         categories: group('categories', 'TSP Categories', 'Product and service categories.', [

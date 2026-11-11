@@ -205,7 +205,7 @@ export const RecordFormModal: React.FC<RecordFormModalProps> = ({
       case 'processingActivities':
         return 'Processing Activity';
       case 'tspReferences':
-        return 'TSP / Product Reference';
+        return 'TSP Product';
       case 'assets':
         return 'System & Asset';
       case 'vendors':
@@ -499,7 +499,7 @@ export const RecordFormModal: React.FC<RecordFormModalProps> = ({
             {inventoryType === 'processingActivities' && (
               <div className="space-y-4">
                 <SearchableRelationshipSelector
-                  label="Linked TSP / Product References"
+                  label="Linked TSP Products"
                   targetInventoryType="tspReferences"
                   availableItems={tspReferences}
                   selectedIds={formData.tspIds || []}
@@ -565,7 +565,7 @@ export const RecordFormModal: React.FC<RecordFormModalProps> = ({
                   onChange={ids => setFormData({ ...formData, vendorIds: ids })}
                 />
                 <SearchableRelationshipSelector
-                  label="Linked TSP / Product References"
+                  label="Linked TSP Products"
                   targetInventoryType="tspReferences"
                   availableItems={tspReferences}
                   selectedIds={formData.tspIds || []}

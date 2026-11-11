@@ -119,7 +119,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenCreateModal }) => {
       case 'processingActivities':
         return 'Processing Activities Inventory';
       case 'tspReferences':
-        return 'TSP & Product References';
+        return 'TSP Products';
       case 'assets':
         return 'Systems & Assets Inventory';
       case 'vendors':
@@ -342,7 +342,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenCreateModal }) => {
                   {matchedTSPs.length > 0 && (
                     <div className="p-1">
                       <div className="px-2 py-1 text-[10px] font-bold text-blue-600 uppercase tracking-wide">
-                        TSP / Product References ({matchedTSPs.length})
+                        TSP Products ({matchedTSPs.length})
                       </div>
                       {matchedTSPs.map(t => (
                         <button
@@ -489,7 +489,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenCreateModal }) => {
                   className="w-full text-left px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 flex items-center gap-2 font-medium"
                 >
                   <Cpu className="w-4 h-4 text-blue-600" />
-                  TSP / Product Reference
+                  TSP Product
                 </button>
 
                 <button
