@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import {
   Search,
   Filter,
@@ -9,6 +9,7 @@ import {
   Copy,
   Trash2,
   SlidersHorizontal,
+  Columns3,
   LayoutGrid,
   Table as TableIcon,
   Network,
@@ -57,6 +58,56 @@ interface InventoryListViewProps {
   onEditRecord: (type: InventoryType, id: string) => void;
 }
 
+const PA_TABLE_COLUMN_STORAGE_KEY = 'trimble-privacy-pa-table-columns-v1';
+
+type ProcessingActivityColumnId =
+  | 'id'
+  | 'name'
+  | 'status'
+  | 'role'
+  | 'purpose'
+  | 'product'
+  | 'retention'
+  | 'risk'
+  | 'owner'
+  | 'updated';
+
+const PROCESSING_ACTIVITY_COLUMNS: { id: ProcessingActivityColumnId; label: string; defaultVisible: boolean }[] = [
+  { id: 'id', label: 'ID', defaultVisible: true },
+  { id: 'name', label: 'Processing Activity Name', defaultVisible: true },
+  { id: 'status', label: 'Status', defaultVisible: true },
+  { id: 'role', label: 'Role', defaultVisible: true },
+  { id: 'purpose', label: 'Purpose for Processing', defaultVisible: true },
+  { id: 'product', label: 'Product', defaultVisible: true },
+  { id: 'retention', label: 'Retention Criteria', defaultVisible: true },
+  { id: 'risk', label: 'Risk', defaultVisible: false },
+  { id: 'owner', label: 'Business Process Owner', defaultVisible: false },
+  { id: 'updated', label: 'Last Updated', defaultVisible: false },
+];
+
+function defaultProcessingActivityColumns(): Record<ProcessingActivityColumnId, boolean> {
+  return PROCESSING_ACTIVITY_COLUMNS.reduce((visibility, column) => {
+    visibility[column.id] = column.defaultVisible;
+    return visibility;
+  }, {} as Record<ProcessingActivityColumnId, boolean>);
+}
+
+function loadProcessingActivityColumns(): Record<ProcessingActivityColumnId, boolean> {
+  const defaults = defaultProcessingActivityColumns();
+  try {
+    const stored = localStorage.getItem(PA_TABLE_COLUMN_STORAGE_KEY);
+    if (!stored) return defaults;
+    const parsed = JSON.parse(stored) as Partial<Record<ProcessingActivityColumnId, boolean>>;
+    const visibility = { ...defaults };
+    PROCESSING_ACTIVITY_COLUMNS.forEach(column => {
+      if (typeof parsed[column.id] === 'boolean') visibility[column.id] = parsed[column.id] as boolean;
+    });
+    return visibility;
+  } catch {
+    return defaults;
+  }
+}
+
 export const InventoryListView: React.FC<InventoryListViewProps> = ({
   inventoryType,
   onOpenCreateModal,
@@ -81,6 +132,7 @@ export const InventoryListView: React.FC<InventoryListViewProps> = ({
   const configuredDataSubjects = getConfiguredOptions('processingActivities', 'dataSubjectCategories');
   const configuredPersonalData = getConfiguredOptions('processingActivities', 'personalDataItems');
   const configuredToms = getConfiguredOptions(inventoryType, 'toms');
+  const configuredRoles = getConfiguredOptions('processingActivities', 'roles');
 
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -90,6 +142,9 @@ export const InventoryListView: React.FC<InventoryListViewProps> = ({
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [tableOptionsOpen, setTableOptionsOpen] = useState(false);
+  const [paColumns, setPaColumns] = useState<Record<ProcessingActivityColumnId, boolean>>(loadProcessingActivityColumns);
+  const tableOptionsRef = useRef<HTMLDivElement>(null);
 
   // Advanced filters state
   const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
@@ -294,8 +349,7 @@ export const InventoryListView: React.FC<InventoryListViewProps> = ({
       let matchesRole = true;
       if (inventoryType === 'processingActivities' && roleFilter !== 'all') {
         const pa = record as ProcessingActivity;
-        if (roleFilter === 'Controller') matchesRole = pa.role === 'Controller' || pa.role === 'Joint Controller';
-        else if (roleFilter.startsWith('Processor')) matchesRole = pa.role.includes('Processor');
+        matchesRole = pa.role === roleFilter;
       }
 
       // 4. Risk Filter
@@ -513,6 +567,162 @@ export const InventoryListView: React.FC<InventoryListViewProps> = ({
     }
   };
 
+  useEffect(() => {
+    if (!tableOptionsOpen) return;
+    const closeOnOutsideClick = (event: MouseEvent) => {
+      if (!tableOptionsRef.current?.contains(event.target as Node)) {
+        setTableOptionsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', closeOnOutsideClick);
+    return () => document.removeEventListener('mousedown', closeOnOutsideClick);
+  }, [tableOptionsOpen]);
+
+  const visiblePaColumns = useMemo(
+    () => PROCESSING_ACTIVITY_COLUMNS.filter(column => paColumns[column.id]),
+    [paColumns],
+  );
+
+  const updatePaColumns = (next: Record<ProcessingActivityColumnId, boolean>) => {
+    setPaColumns(next);
+    localStorage.setItem(PA_TABLE_COLUMN_STORAGE_KEY, JSON.stringify(next));
+  };
+
+  const togglePaColumn = (columnId: ProcessingActivityColumnId) => {
+    updatePaColumns({ ...paColumns, [columnId]: !paColumns[columnId] });
+  };
+
+  const renderProcessingActivityCell = (columnId: ProcessingActivityColumnId, record: any, relations: ReturnType<typeof getRelatedRecords>) => {
+    switch (columnId) {
+      case 'id':
+        return (
+          <td key={columnId} className="p-3.5 whitespace-nowrap">
+            <span className="font-mono text-[10px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
+              {record.id}
+            </span>
+          </td>
+        );
+      case 'name':
+        return (
+          <td key={columnId} className="p-3.5 max-w-xs">
+            <button
+              type="button"
+              onClick={() => setSelectedRecord({ id: record.id, type: inventoryType })}
+              className="font-bold text-slate-900 hover:text-indigo-600 text-left truncate block max-w-full"
+              title={record.name}
+            >
+              {record.name}
+            </button>
+            {record.description && (
+              <p className="text-[11px] text-slate-500 truncate mt-0.5">{record.description}</p>
+            )}
+          </td>
+        );
+      case 'status':
+        return (
+          <td key={columnId} className="p-3.5">
+            <StatusBadge status={record.status} />
+          </td>
+        );
+      case 'role':
+        return (
+          <td key={columnId} className="p-3.5">
+            <span
+              className={`px-2 py-0.5 rounded text-[11px] font-bold border ${
+                record.role === 'Controller'
+                  ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                  : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+              }`}
+            >
+              {record.role}
+            </span>
+          </td>
+        );
+      case 'purpose': {
+        const purposeForProcessing = record.purpose?.trim()
+          ? record.purpose
+          : record.categoriesOfProcessing?.length
+            ? record.categoriesOfProcessing.join(', ')
+            : '';
+        return (
+          <td key={columnId} className="p-3.5 max-w-xs">
+            {purposeForProcessing ? (
+              <span className="text-slate-800 font-medium truncate block" title={purposeForProcessing}>
+                {purposeForProcessing}
+              </span>
+            ) : (
+              <span className="text-slate-400 italic">Unspecified</span>
+            )}
+          </td>
+        );
+      }
+      case 'product':
+        return (
+          <td key={columnId} className="p-3.5">
+            {relations.tspReferences.length > 0 ? (
+              <div className="flex flex-col gap-0.5">
+                {relations.tspReferences.slice(0, 1).map(tsp => (
+                  <span key={tsp.id} className="font-medium text-slate-800 truncate max-w-[140px]" title={tsp.name}>
+                    {tsp.name}
+                  </span>
+                ))}
+                {relations.tspReferences.length > 1 && (
+                  <span className="text-[10px] text-indigo-600 font-bold">
+                    +{relations.tspReferences.length - 1} more
+                  </span>
+                )}
+              </div>
+            ) : (
+              <span className="text-slate-400 text-[11px]">None linked</span>
+            )}
+          </td>
+        );
+      case 'retention': {
+        const retentionCriteria = record.retentionPeriod?.trim();
+        const hasRetentionCriteria = Boolean(retentionCriteria && retentionCriteria !== 'None');
+        return (
+          <td key={columnId} className="p-3.5 max-w-[180px]">
+            {hasRetentionCriteria ? (
+              <span className="text-slate-700 text-[11px] font-medium line-clamp-2" title={retentionCriteria}>
+                {retentionCriteria}
+              </span>
+            ) : (
+              <span className="text-amber-700 font-semibold text-[10px] flex items-center gap-1 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 w-fit">
+                <AlertCircle className="w-3 h-3" /> Missing
+              </span>
+            )}
+          </td>
+        );
+      }
+      case 'risk':
+        return (
+          <td key={columnId} className="p-3.5">
+            {record.involvesHighRiskData ? (
+              <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 text-[10px] font-bold border border-rose-200 flex items-center gap-1 w-fit">
+                <ShieldAlert className="w-3 h-3 text-rose-600" /> High Risk
+              </span>
+            ) : (
+              <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-medium border border-slate-200">
+                Standard
+              </span>
+            )}
+          </td>
+        );
+      case 'owner':
+        return (
+          <td key={columnId} className="p-3.5 font-medium text-slate-700">{record.owner || '—'}</td>
+        );
+      case 'updated':
+        return (
+          <td key={columnId} className="p-3.5 text-slate-500 text-[11px] whitespace-nowrap">
+            {record.lastModifiedDate ? new Date(record.lastModifiedDate).toLocaleDateString() : 'N/A'}
+          </td>
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-6 animate-in fade-in duration-200">
       {/* Header Banner */}
@@ -567,22 +777,36 @@ export const InventoryListView: React.FC<InventoryListViewProps> = ({
           </div>
 
           {/* Status Filters */}
-          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-md text-xs">
-            {['all', ...configuredStatuses].map(status => (
-              <button
-                key={status}
-                type="button"
-                onClick={() => setStatusFilter(status)}
-                className={`px-2.5 py-1 rounded font-medium transition ${
-                  statusFilter === status
-                    ? 'bg-white text-slate-900 shadow-2xs font-semibold'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                {status === 'all' ? 'All Status' : status}
-              </button>
-            ))}
-          </div>
+          {inventoryType === 'processingActivities' ? (
+            <select
+              value={statusFilter}
+              onChange={e => setStatusFilter(e.target.value)}
+              aria-label="Status"
+              className="bg-white border border-slate-300 text-slate-700 text-xs font-medium rounded px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-600"
+            >
+              <option value="all">All Status</option>
+              {configuredStatuses.map(status => (
+                <option key={status} value={status}>{status}</option>
+              ))}
+            </select>
+          ) : (
+            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-md text-xs">
+              {['all', ...configuredStatuses].map(status => (
+                <button
+                  key={status}
+                  type="button"
+                  onClick={() => setStatusFilter(status)}
+                  className={`px-2.5 py-1 rounded font-medium transition ${
+                    statusFilter === status
+                      ? 'bg-white text-slate-900 shadow-2xs font-semibold'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  {status === 'all' ? 'All Status' : status}
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Processing Activity Specific Role Filter */}
           {inventoryType === 'processingActivities' && (
@@ -592,8 +816,9 @@ export const InventoryListView: React.FC<InventoryListViewProps> = ({
               className="bg-white border border-slate-300 text-slate-700 text-xs font-medium rounded px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-600"
             >
               <option value="all">All Roles</option>
-              <option value="Controller">Controller</option>
-              <option value="Processor">Processor</option>
+              {configuredRoles.map(role => (
+                <option key={role} value={role}>{role}</option>
+              ))}
             </select>
           )}
 
@@ -678,29 +903,80 @@ export const InventoryListView: React.FC<InventoryListViewProps> = ({
             <strong className="text-slate-900">{filteredRecords.length}</strong> of {currentRecords.length}
           </span>
 
-          {/* Table / Grid Mode Toggle */}
-          <div className="flex items-center border border-slate-200 rounded-md p-0.5 bg-slate-50">
-            <button
-              type="button"
-              onClick={() => setViewMode('table')}
-              className={`p-1 rounded text-xs transition ${
-                viewMode === 'table' ? 'bg-white text-slate-900 shadow-2xs font-bold' : 'text-slate-400 hover:text-slate-600'
-              }`}
-              title="Table View"
-            >
-              <TableIcon className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode('grid')}
-              className={`p-1 rounded text-xs transition ${
-                viewMode === 'grid' ? 'bg-white text-slate-900 shadow-2xs font-bold' : 'text-slate-400 hover:text-slate-600'
-              }`}
-              title="Card Grid View"
-            >
-              <LayoutGrid className="w-4 h-4" />
-            </button>
-          </div>
+          {inventoryType === 'processingActivities' && (
+            <div className="relative" ref={tableOptionsRef}>
+              <button
+                type="button"
+                onClick={() => setTableOptionsOpen(open => !open)}
+                aria-expanded={tableOptionsOpen}
+                aria-haspopup="menu"
+                className={`px-2.5 py-1.5 rounded text-xs font-medium transition flex items-center gap-1.5 border ${
+                  tableOptionsOpen
+                    ? 'bg-slate-900 text-white border-slate-900'
+                    : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                }`}
+              >
+                <Columns3 className="w-3.5 h-3.5" />
+                Table options
+              </button>
+              {tableOptionsOpen && (
+                <div
+                  role="menu"
+                  className="absolute right-0 mt-1 w-64 rounded-md border border-slate-200 bg-white shadow-lg z-30 p-2"
+                >
+                  <p className="px-2 pt-1 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                    Show columns
+                  </p>
+                  {PROCESSING_ACTIVITY_COLUMNS.map(column => (
+                    <label
+                      key={column.id}
+                      className="flex items-center gap-2 rounded px-2 py-1.5 text-xs text-slate-700 hover:bg-slate-50 cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={paColumns[column.id]}
+                        onChange={() => togglePaColumn(column.id)}
+                        className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                      />
+                      {column.label}
+                    </label>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => updatePaColumns(defaultProcessingActivityColumns())}
+                    className="mt-1 w-full rounded px-2 py-1.5 text-left text-xs font-semibold text-indigo-700 hover:bg-indigo-50"
+                  >
+                    Reset to default preview
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {inventoryType !== 'processingActivities' && (
+            <div className="flex items-center border border-slate-200 rounded-md p-0.5 bg-slate-50">
+              <button
+                type="button"
+                onClick={() => setViewMode('table')}
+                className={`p-1 rounded text-xs transition ${
+                  viewMode === 'table' ? 'bg-white text-slate-900 shadow-2xs font-bold' : 'text-slate-400 hover:text-slate-600'
+                }`}
+                title="Table View"
+              >
+                <TableIcon className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('grid')}
+                className={`p-1 rounded text-xs transition ${
+                  viewMode === 'grid' ? 'bg-white text-slate-900 shadow-2xs font-bold' : 'text-slate-400 hover:text-slate-600'
+                }`}
+                title="Card Grid View"
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -939,7 +1215,7 @@ export const InventoryListView: React.FC<InventoryListViewProps> = ({
           actionLabel="Create Record"
           onAction={() => onOpenCreateModal(inventoryType)}
         />
-      ) : viewMode === 'table' ? (
+      ) : inventoryType === 'processingActivities' || viewMode === 'table' ? (
         <div className="bg-white rounded-lg border border-slate-200 overflow-hidden shadow-2xs">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs text-slate-700 border-collapse">
@@ -953,18 +1229,12 @@ export const InventoryListView: React.FC<InventoryListViewProps> = ({
                       className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                     />
                   </th>
-                  <th className="p-3.5">{inventoryType === 'entities' ? 'Name' : 'Name & ID'}</th>
-
-                  {/* Processing Activity Specific Columns */}
-                  {inventoryType === 'processingActivities' && (
-                    <>
-                      <th className="p-3.5">Role</th>
-                      <th className="p-3.5">Purpose / Categories</th>
-                      <th className="p-3.5">Business Process Owner</th>
-                      <th className="p-3.5">TSP / Product</th>
-                      <th className="p-3.5">Risk</th>
-                      <th className="p-3.5">Retention</th>
-                    </>
+                  {inventoryType === 'processingActivities' ? (
+                    visiblePaColumns.map(column => (
+                      <th key={column.id} className="p-3.5">{column.label}</th>
+                    ))
+                  ) : (
+                    <th className="p-3.5">{inventoryType === 'entities' ? 'Name' : 'Name & ID'}</th>
                   )}
 
                   {/* TSP Specific Columns */}
@@ -1007,7 +1277,7 @@ export const InventoryListView: React.FC<InventoryListViewProps> = ({
                     </>
                   )}
 
-                  {inventoryType !== 'entities' && (
+                  {inventoryType !== 'entities' && inventoryType !== 'processingActivities' && (
                     <>
                       <th className="p-3.5">Status</th>
                       <th className="p-3.5">Last Updated</th>
@@ -1035,7 +1305,11 @@ export const InventoryListView: React.FC<InventoryListViewProps> = ({
                         />
                       </td>
 
+                      {inventoryType === 'processingActivities' &&
+                        visiblePaColumns.map(column => renderProcessingActivityCell(column.id, record, relations))}
+
                       {/* Name & ID */}
+                      {inventoryType !== 'processingActivities' && (
                       <td className="p-3.5 max-w-xs">
                         {inventoryType === 'entities' ? (
                           <button
@@ -1065,85 +1339,6 @@ export const InventoryListView: React.FC<InventoryListViewProps> = ({
                           </>
                         )}
                       </td>
-
-                      {/* Processing Activity Specific Fields */}
-                      {inventoryType === 'processingActivities' && (
-                        <>
-                          {/* Role */}
-                          <td className="p-3.5">
-                            <span
-                              className={`px-2 py-0.5 rounded text-[11px] font-bold border ${
-                                record.role === 'Controller'
-                                  ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
-                                  : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                              }`}
-                            >
-                              {record.role}
-                            </span>
-                          </td>
-
-                          {/* Purpose / Categories */}
-                          <td className="p-3.5 max-w-xs">
-                            {record.purpose ? (
-                              <span className="text-slate-800 font-medium truncate block" title={record.purpose}>
-                                {record.purpose}
-                              </span>
-                            ) : record.categoriesOfProcessing && record.categoriesOfProcessing.length > 0 ? (
-                              <span className="text-slate-800 font-medium truncate block">
-                                {record.categoriesOfProcessing.join(', ')}
-                              </span>
-                            ) : (
-                              <span className="text-slate-400 italic">Unspecified</span>
-                            )}
-                          </td>
-
-                          {/* Business Process Owner */}
-                          <td className="p-3.5 font-medium text-slate-700">{record.owner || '—'}</td>
-
-                          {/* TSP / Product */}
-                          <td className="p-3.5">
-                            {relations.tspReferences.length > 0 ? (
-                              <div className="flex flex-col gap-0.5">
-                                {relations.tspReferences.slice(0, 1).map(tsp => (
-                                  <span key={tsp.id} className="font-medium text-slate-800 truncate max-w-[140px]">
-                                    {tsp.name}
-                                  </span>
-                                ))}
-                                {relations.tspReferences.length > 1 && (
-                                  <span className="text-[10px] text-indigo-600 font-bold">
-                                    +{relations.tspReferences.length - 1} more TSPs
-                                  </span>
-                                )}
-                              </div>
-                            ) : (
-                              <span className="text-slate-400 text-[11px]">None linked</span>
-                            )}
-                          </td>
-
-                          {/* Risk */}
-                          <td className="p-3.5">
-                            {record.involvesHighRiskData ? (
-                              <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 text-[10px] font-bold border border-rose-200 flex items-center gap-1 w-fit">
-                                <ShieldAlert className="w-3 h-3 text-rose-600" /> High Risk
-                              </span>
-                            ) : (
-                              <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-medium border border-slate-200">
-                                Standard
-                              </span>
-                            )}
-                          </td>
-
-                          {/* Retention */}
-                          <td className="p-3.5">
-                            {record.retentionPeriod ? (
-                              <span className="text-slate-700 text-[11px] font-medium">{record.retentionPeriod}</span>
-                            ) : (
-                              <span className="text-amber-700 font-semibold text-[10px] flex items-center gap-1 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 w-fit">
-                                <AlertCircle className="w-3 h-3" /> Missing
-                              </span>
-                            )}
-                          </td>
-                        </>
                       )}
 
                       {/* TSP Specific Fields */}
@@ -1221,7 +1416,7 @@ export const InventoryListView: React.FC<InventoryListViewProps> = ({
                         </>
                       )}
 
-                      {inventoryType !== 'entities' && (
+                      {inventoryType !== 'entities' && inventoryType !== 'processingActivities' && (
                         <>
                           {/* Status */}
                           <td className="p-3.5">
@@ -1238,45 +1433,59 @@ export const InventoryListView: React.FC<InventoryListViewProps> = ({
                       {/* Row Actions */}
                       <td className="p-3.5 text-right relative">
                         <div className="flex items-center justify-end gap-1">
-                          <button
-                            type="button"
-                            onClick={() => setSelectedRecord({ id: record.id, type: inventoryType })}
-                            className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition"
-                            title="View Record Details & Lineage"
-                          >
-                            <Eye className="w-3.5 h-3.5" />
-                          </button>
+                          {inventoryType !== 'processingActivities' && (
+                            <button
+                              type="button"
+                              onClick={() => setSelectedRecord({ id: record.id, type: inventoryType })}
+                              className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition"
+                              title="View Record Details & Lineage"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={() => onEditRecord(inventoryType, record.id)}
-                            className="p-1 rounded text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition"
+                            className={`group p-1 rounded text-slate-400 transition ${
+                              inventoryType === 'processingActivities'
+                                ? 'hover:bg-slate-100'
+                                : 'hover:text-indigo-600 hover:bg-indigo-50'
+                            }`}
                             title="Edit Record"
                           >
-                            <Edit className="w-3.5 h-3.5" />
+                            <Edit className={inventoryType === 'processingActivities' ? 'w-[15.4px] h-[15.4px] group-hover:stroke-[#051329] group-hover:text-[#051329]' : 'w-3.5 h-3.5'} />
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => handleSaveDraftQuick(record.id)}
-                            className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition"
-                            title="Save as Draft"
-                          >
-                            <Save className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => duplicateRecord(inventoryType, record.id)}
-                            className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition"
-                            title="Duplicate Record"
-                          >
-                            <Copy className="w-3.5 h-3.5" />
-                          </button>
+                          {inventoryType !== 'processingActivities' && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => handleSaveDraftQuick(record.id)}
+                                className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition"
+                                title="Save as Draft"
+                              >
+                                <Save className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => duplicateRecord(inventoryType, record.id)}
+                                className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition"
+                                title="Duplicate Record"
+                              >
+                                <Copy className="w-3.5 h-3.5" />
+                              </button>
+                            </>
+                          )}
                           <button
                             type="button"
                             onClick={() => setRecordToDelete({ id: record.id, name: record.name })}
-                            className="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition"
+                            className={`group p-1 rounded text-slate-400 transition ${
+                              inventoryType === 'processingActivities'
+                                ? 'hover:bg-slate-100'
+                                : 'hover:text-rose-600 hover:bg-rose-50'
+                            }`}
                             title="Delete Record"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <Trash2 className={inventoryType === 'processingActivities' ? 'w-[15.4px] h-[15.4px] group-hover:stroke-[#051329] group-hover:text-[#051329]' : 'w-3.5 h-3.5'} />
                           </button>
                         </div>
                       </td>

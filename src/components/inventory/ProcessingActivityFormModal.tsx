@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   X,
   Save,
@@ -166,7 +166,6 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
     tags: [],
   });
 
-  const statusOptions = getConfiguredOptions('processingActivities', 'statuses', isEdit ? [formData.status || ''] : []);
   const roleOptions = getConfiguredOptions('processingActivities', 'roles', isEdit ? [formData.role || ''] : []);
   const controllerPurposeOptions = getConfiguredOptions('processingActivities', 'controllerPurposes', isEdit ? [formData.purpose || ''] : []);
   const processorCategoryOptions = getConfiguredOptions(
@@ -197,6 +196,18 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
   );
   const configuredToms = getConfiguredOptions('processingActivities', 'toms', isEdit ? formData.toms || [] : []);
   const configuredTspStatuses = getConfiguredOptions('processingActivities', 'tspStatuses', isEdit ? [formData.tspStatus || ''] : []);
+  const statusBeforeArchive = useRef<StatusType | ''>('');
+
+  const setArchived = (archived: boolean) => {
+    setFormData(prev => {
+      if (archived) {
+        if (prev.status !== 'Archived') statusBeforeArchive.current = prev.status || '';
+        return { ...prev, status: 'Archived' as StatusType };
+      }
+      const restored = statusBeforeArchive.current;
+      return { ...prev, status: (restored && restored !== 'Archived' ? restored : 'Under Review') as StatusType };
+    });
+  };
 
   // Role switch warning modal state
   const [pendingRoleSwitch, setPendingRoleSwitch] = useState<ProcessingRole | null>(null);
@@ -211,6 +222,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
   // Populate form if editing
   useEffect(() => {
     setRevealedDataSubject(null);
+    statusBeforeArchive.current = '';
     if (isEdit && recordIdToEdit) {
       const existing = processingActivities.find(x => x.id === recordIdToEdit);
       if (existing) {
@@ -930,12 +942,27 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
     return Math.min(100, score);
   }, [formData]);
 
+  const savedActivityStatus = isEdit
+    ? processingActivities.find(activity => activity.id === recordIdToEdit)?.status
+    : undefined;
+  const previouslyPublished = savedActivityStatus === 'Published' || savedActivityStatus === 'Approved';
+
+  const statusForSaveAndClose = (): StatusType => {
+    if (formData.status === 'Archived') return 'Archived';
+    if (!previouslyPublished) {
+      if (!formData.status || formData.status === 'Published' || formData.status === 'Approved') return 'Draft';
+      return formData.status;
+    }
+    if (!formData.status || formData.status === 'Approved') return 'Published';
+    return formData.status;
+  };
+
   // Form Submission
-  const handleSaveDraft = () => {
+  const handleSaveAndClose = () => {
     const payload = {
       ...formData,
-      status: 'Draft' as StatusType,
-      name: formData.name || 'Untitled Processing Activity (Draft)',
+      status: statusForSaveAndClose(),
+      name: formData.name?.trim() || 'Untitled Processing Activity (Draft)',
     };
 
     if (isEdit && recordIdToEdit) {
@@ -948,6 +975,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
 
   const handleFinalSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (previouslyPublished) return;
 
     if (!formData.name || !formData.name.trim()) {
       setCurrentStep(1);
@@ -960,7 +988,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
 
     const payload = {
       ...formData,
-      status: formData.status || 'Under Review',
+      status: 'Published' as StatusType,
     };
 
     if (isEdit && recordIdToEdit) {
@@ -984,26 +1012,28 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
               <FileText className="w-5 h-5" />
             </div>
             <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-indigo-300">
-                  {isEdit ? `Editing ${recordIdToEdit}` : 'New Record Wizard'}
-                </span>
-                <span className="text-slate-500">•</span>
-                <select
-                  value={formData.status || ''}
-                  onChange={e => setFormData({ ...formData, status: e.target.value as StatusType })}
-                  className="bg-slate-800 border border-slate-700 text-slate-200 text-xs font-semibold rounded px-2 py-0.5 focus:outline-none focus:border-indigo-500"
-                >
-                  <option value="">Select status</option>
-                  {statusOptions.map(option => (
-                    <option key={option} value={option}>{option}</option>
-                  ))}
-                </select>
+              <div className="flex items-center gap-2 min-w-0">
+                <h2 className="text-base font-bold text-white truncate">
+                  {isEdit && recordIdToEdit
+                    ? `${formData.name || '(Untitled Processing Activity)'} [${recordIdToEdit}]`
+                    : (formData.name || '(Untitled Processing Activity)')}
+                </h2>
+                {formData.status && (
+                  <span
+                    className={`shrink-0 inline-flex items-center rounded px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide border select-none pointer-events-none ${
+                      formData.status === 'Published' || formData.status === 'Approved'
+                        ? 'bg-emerald-500/15 text-emerald-300 border-emerald-400/30'
+                        : formData.status === 'Under Review'
+                        ? 'bg-amber-500/15 text-amber-200 border-amber-400/30'
+                        : formData.status === 'Archived'
+                        ? 'bg-slate-700 text-slate-300 border-slate-600'
+                        : 'bg-indigo-500/20 text-indigo-200 border-indigo-400/30'
+                    }`}
+                  >
+                    {formData.status === 'Approved' ? 'Published' : formData.status}
+                  </span>
+                )}
               </div>
-
-              <h2 className="text-base font-bold text-white truncate mt-0.5">
-                {formData.name || '(Untitled Processing Activity)'}
-              </h2>
             </div>
           </div>
 
@@ -1084,9 +1114,6 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                   <FileText className="w-5 h-5 text-indigo-600" />
                   Step 1: Record Overview & Basic Identification
                 </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Define the primary activity name, operational purpose summary, process owner, and initial software reference.
-                </p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
@@ -1119,6 +1146,19 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                 onChange={e => setFormData({ ...formData, description: e.target.value })}
                 error={!formData.description?.trim() ? 'Description is required' : undefined}
               />
+
+              <label className="flex items-start gap-2.5 w-fit cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.status === 'Archived'}
+                  onChange={e => setArchived(e.target.checked)}
+                  className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 mt-0.5"
+                />
+                <span>
+                  <span className="block text-xs font-semibold text-slate-800">Archive this record</span>
+                  <span className="block text-[11px] text-slate-500">Sets the activity status to Archived.</span>
+                </span>
+              </label>
             </div>
           )}
 
@@ -1130,9 +1170,6 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                   <Shield className="w-5 h-5 text-indigo-600" />
                   Step 2: Processing Role & Requirements
                 </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Select your legal role (Controller or Processor). This configures role-specific regulatory compliance fields.
-                </p>
               </div>
 
               {/* ROLE SELECTION QUESTION */}
@@ -1282,9 +1319,6 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                       <Shield className="w-4 h-4 text-indigo-600" />
                       Legal Basis for Processing
                     </h4>
-                    <p className="text-xs text-slate-500">
-                      Identify the Article 6 GDPR legal basis governing this processing activity.
-                    </p>
                   </div>
                 </div>
 
@@ -1365,9 +1399,6 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                   <User className="w-5 h-5 text-indigo-600" />
                   Step 3: Personal Data
                 </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Select target Data Subject categories and map individual personal data items from the centrally managed catalog to each group.
-                </p>
               </div>
 
               {/* Data Subjects Category Selector */}
@@ -1507,9 +1538,6 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                   <Building className="w-5 h-5 text-indigo-600" />
                   Step 4: Categories of Recipients
                 </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Select internal teams, external recipient categories, and link relevant third-party vendors.
-                </p>
               </div>
 
               {/* Group 1: Trimble Internal */}
@@ -1654,9 +1682,6 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                   <Globe className="w-5 h-5 text-indigo-600" />
                   Step 5: Data Flows
                 </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Map the data flows in this processing activity, from source to destination, if applicable. Consider transfer safeguards and international transfers to third countries.
-                </p>
               </div>
 
               <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-4">
@@ -1906,9 +1931,6 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                   <Clock className="w-5 h-5 text-indigo-600" />
                   Step 6: Data Retention
                 </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Define statutory data retention limits and policy descriptions for this processing activity.
-                </p>
               </div>
 
               {/* DATA RETENTION POLICY SECTION */}
@@ -1920,9 +1942,6 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                       Data Retention Policy
                       <span className="text-rose-600 font-bold">*</span>
                     </h4>
-                    <p className="text-xs text-slate-500">
-                      Select whether this processing activity operates under a custom retention schedule or has no defined retention policy.
-                    </p>
                   </div>
                 </div>
 
@@ -2053,9 +2072,6 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                   <Lock className="w-5 h-5 text-indigo-600" />
                   Step 7: Technical & Organisational Security Measures (TOMs)
                 </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Specify TSP registration status and select Art. 32 Technical & Organisational Security Measures (TOMs).
-                </p>
               </div>
 
               <SecurityMeasuresSection
@@ -2080,9 +2096,6 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                   <Layers className="w-5 h-5 text-indigo-600" />
                   Step 8: Related Inventory Lineage Mapping
                 </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Link this Processing Activity to TSPs, Systems & Assets, Vendors, and Legal Entities.
-                </p>
               </div>
 
               <div className="space-y-4">
@@ -2146,9 +2159,6 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                     <CheckCircle2 className="w-5 h-5 text-emerald-600" />
                     Step 9: Record Audit & Submission Review
                   </h3>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Review record validation status, address missing compliance parameters, and verify RoPA completeness.
-                  </p>
                 </div>
                 <div className="text-right">
                   <span className="text-[10px] uppercase font-bold text-slate-400 block">Completeness</span>
@@ -2467,14 +2477,16 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
         {/* STEP FOOTER CONTROLS */}
         <div className="px-6 py-3.5 border-t border-slate-200 bg-slate-50 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handleSaveDraft}
-              className="px-3.5 py-1.5 rounded-md border border-slate-300 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-100 transition shadow-2xs flex items-center gap-1.5"
-            >
-              <Save className="w-3.5 h-3.5 text-slate-500" />
-              Save Draft
-            </button>
+            {!previouslyPublished && (
+              <button
+                type="button"
+                onClick={handleSaveAndClose}
+                className="px-3.5 py-1.5 rounded-md border border-slate-300 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-100 transition shadow-2xs flex items-center gap-1.5"
+              >
+                <Save className="w-3.5 h-3.5 text-slate-500" />
+                Save as Draft
+              </button>
+            )}
 
             {currentStep > 1 && (
               <button
@@ -2489,7 +2501,7 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
           </div>
 
           <div className="flex items-center gap-2">
-            {currentStep < 8 ? (
+            {currentStep < 8 && (
               <button
                 type="button"
                 onClick={() => setCurrentStep(prev => Math.min(8, prev + 1))}
@@ -2498,16 +2510,26 @@ export const ProcessingActivityFormModal: React.FC<ProcessingActivityFormModalPr
                 Next Section
                 <ArrowRight className="w-4 h-4" />
               </button>
-            ) : (
+            )}
+            {previouslyPublished ? (
+              <button
+                type="button"
+                onClick={handleSaveAndClose}
+                className="px-5 py-2 rounded-md bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 transition flex items-center gap-1.5 shadow-sm"
+              >
+                <Save className="w-4 h-4" />
+                Update Record
+              </button>
+            ) : currentStep === 8 ? (
               <button
                 type="submit"
                 onClick={handleFinalSubmit}
                 className="px-5 py-2 rounded-md bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 transition flex items-center gap-1.5 shadow-sm"
               >
                 <Check className="w-4 h-4" />
-                {isEdit ? 'Update Record' : 'Save & Publish Record'}
+                Save and Publish
               </button>
-            )}
+            ) : null}
           </div>
         </div>
       </div>

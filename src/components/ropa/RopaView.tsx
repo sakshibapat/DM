@@ -167,7 +167,7 @@ export const RopaView: React.FC = () => {
           value={statusFilter}
           options={[
             ['all', 'All status'],
-            ['Approved', 'Approved'],
+            ['Published', 'Published'],
             ['Under Review', 'Under Review'],
             ['Draft', 'Draft'],
             ['Archived', 'Archived'],
